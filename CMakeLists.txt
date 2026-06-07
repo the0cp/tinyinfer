@@ -9,6 +9,7 @@ add_library(tinyinfer
     src/ops.cpp
     src/tensor.cpp
     src/thread_pool.cpp
+    src/graph.cpp
 )
 
 target_include_directories(tinyinfer PUBLIC include)
@@ -36,3 +37,15 @@ add_executable(bench_matmul
 )
 
 target_link_libraries(bench_matmul PRIVATE tinyinfer)
+
+add_executable(model_demo
+    examples/model.cpp
+)
+
+target_link_libraries(model_demo PRIVATE tinyinfer)
+
+add_executable(graph_demo
+    examples/graph_demo.cpp
+)
+
+target_link_libraries(graph_demo PRIVATE tinyinfer)
