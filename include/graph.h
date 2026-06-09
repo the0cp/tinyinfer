@@ -35,6 +35,8 @@ public:
 
     void execute();
 
+    void execute_topological();
+
     Tensor forward(
         const std::string& input_name,
         const Tensor& input,
@@ -51,6 +53,10 @@ private:
     std::vector<Node> nodes_;
 
     const Tensor& get_tensor_or_throw(const std::string& name) const;
+
+    bool inputs_ready(const Node& node) const;
+    void execute_node(const Node& node);
+    void clear_node_outputs();
 };
 
 }
