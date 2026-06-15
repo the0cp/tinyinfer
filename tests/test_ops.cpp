@@ -316,6 +316,128 @@ static void test_graph_repeated_forward() {
     assert_close(y2.at({0, 1}), 64);
 }
 
+static void test_graph_execution_order() {
+    Tensor x({2, 3}, {
+        1, 2, 3,
+        4, 5, 6
+    });
+
+    Tensor w1({3, 4}, {
+        0.1f, 0.2f, 0.3f, 0.4f,
+        0.5f, 0.6f, 0.7f, 0.8f,
+        0.9f, 1.0f, 1.1f, 1.2f
+    });
+
+    Tensor b1({4}, {
+        0.1f, 0.1f, 0.1f, 0.1f
+    });
+
+    Tensor w2({4, 2}, {
+        0.1f, 0.2f,
+        0.3f, 0.4f,
+        0.5f, 0.6f,
+        0.7f, 0.8f
+    });
+
+    Tensor b2({2}, {
+        0.5f, 0.5f
+    });
+
+    Graph graph;
+
+    graph.set_tensor("w1", std::move(w1));
+    graph.set_tensor("b1", std::move(b1));
+    graph.set_tensor("w2", std::move(w2));
+    graph.set_tensor("b2", std::move(b2));
+
+    graph.add_node("linear2", OpType::Linear, {"a1", "w2", "b2"}, "logits");
+    graph.add_node("relu1", OpType::ReLU, {"h1"}, "a1");
+    graph.add_node("linear1", OpType::Linear, {"input", "w1", "b1"}, "h1");
+
+    Tensor y = graph.forward("input", x, "logits");
+
+    assert_close(y.at({0, 0}), 8.78f);
+    assert_close(y.at({0, 1}), 10.7f);
+    assert_close(y.at({1, 0}), 19.04f);
+    assert_close(y.at({1, 1}), 23.3f);
+
+    const auto& order = graph.last_execution_order();
+
+    if (order.size() != 3) {
+        throw std::runtime_error("execution order size mismatch");
+    }
+
+    if (order[0] != "linear1" || order[1] != "relu1" || order[2] != "linear2") {
+        throw std::runtime_error("unexpected execution order");
+    }
+}
+
+static void test_graph_missing_dependency() {
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"missing_tensor"}, "out");
+
+    Tensor x({1, 1}, {1.0f});
+
+    bool caught = false;
+
+    try {
+        graph.forward("input", x, "out");
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+
+    if (!caught) {
+        throw std::runtime_error("missing dependency test failed");
+    }
+}
+
+static void test_graph_residual_add() {
+    Tensor x({2, 3}, {
+        1, -2, 3,
+        4, -5, 6
+    });
+
+    Tensor w({3, 3}, {
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1
+    });
+
+    Tensor b({3}, {
+        0, 0, 0
+    });
+
+    Graph graph;
+
+    graph.set_tensor("w", std::move(w));
+    graph.set_tensor("b", std::move(b));
+
+    graph.add_node("relu1", OpType::ReLU, {"sum"}, "output");
+    graph.add_node("add1", OpType::Add, {"input", "h"}, "sum");
+    graph.add_node("linear1", OpType::Linear, {"input", "w", "b"}, "h");
+
+    Tensor y = graph.forward("input", x, "output");
+
+    assert_close(y.at({0, 0}), 2.0f);
+    assert_close(y.at({0, 1}), 0.0f);
+    assert_close(y.at({0, 2}), 6.0f);
+
+    assert_close(y.at({1, 0}), 8.0f);
+    assert_close(y.at({1, 1}), 0.0f);
+    assert_close(y.at({1, 2}), 12.0f);
+
+    const auto& order = graph.last_execution_order();
+
+    if (order.size() != 3) {
+        throw std::runtime_error("residual execution order size mismatch");
+    }
+
+    if (order[0] != "linear1" || order[1] != "add1" || order[2] != "relu1") {
+        throw std::runtime_error("unexpected residual execution order");
+    }
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -327,6 +449,9 @@ int main(){
     test_graph_forward();
     test_graph_topological_forward();
     test_graph_repeated_forward();
+    test_graph_execution_order();
+    test_graph_missing_dependency();
+    test_graph_residual_add();
 
     std::cout << "All tests passed.\n";
     return 0;

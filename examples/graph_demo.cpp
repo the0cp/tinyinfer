@@ -38,36 +38,19 @@ int main() {
     graph.set_tensor("w2", std::move(w2));
     graph.set_tensor("b2", std::move(b2));
 
-    graph.add_node(
-        "linear1",
-        OpType::Linear,
-        {"input", "w1", "b1"},
-        "h1"
-    );
+    graph.add_node("linear2", OpType::Linear, {"a1", "w2", "b2"}, "logits");
+    graph.add_node("softmax", OpType::Softmax, {"logits"}, "prob");
+    graph.add_node("relu1", OpType::ReLU, {"h1"}, "a1");
+    graph.add_node("linear1", OpType::Linear, {"input", "w1", "b1"}, "h1");
 
-    graph.add_node(
-        "relu1",
-        OpType::ReLU,
-        {"h1"},
-        "a1"
-    );
-
-    graph.add_node(
-        "linear2",
-        OpType::Linear,
-        {"a1", "w2", "b2"},
-        "logits"
-    );
-
-    graph.add_node(
-        "softmax",
-        OpType::Softmax,
-        {"logits"},
-        "prob"
-    );
+    std::cout << graph.dump() << "\n";
 
     Tensor prob = graph.forward("input", x, "prob");
 
+    std::cout << graph.dump_execution_order() << "\n";
+    std::cout << graph.dump_tensors() << "\n";
+
+    std::cout << "Output:\n";
     std::cout << prob.at({0, 0}) << " " << prob.at({0, 1}) << "\n";
     std::cout << prob.at({1, 0}) << " " << prob.at({1, 1}) << "\n";
 

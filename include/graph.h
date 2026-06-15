@@ -12,8 +12,11 @@ namespace tinyinfer{
 enum class OpType{
     Linear,
     ReLU,
-    Softmax
+    Softmax,
+    Add
 };
+
+const char* op_type_to_string(OpType op);
 
 struct Node{
     std::string name;
@@ -48,9 +51,16 @@ public:
     size_t num_nodes() const;
     bool has_tensor(const std::string& name) const;
 
+    std::string dump() const;
+    std::string dump_tensors() const;
+    std::string dump_execution_order() const;
+
+    const std::vector<std::string>& last_execution_order() const;
+
 private:
     std::unordered_map<std::string, Tensor> tensors_;
     std::vector<Node> nodes_;
+    std::vector<std::string> last_execution_order_;
 
     const Tensor& get_tensor_or_throw(const std::string& name) const;
 

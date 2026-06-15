@@ -49,3 +49,9 @@ add_executable(graph_demo
 )
 
 target_link_libraries(graph_demo PRIVATE tinyinfer)
+
+add_executable(residual_demo
+    examples/residual_demo.cpp
+)
+
+target_link_libraries(residual_demo PRIVATE tinyinfer)
