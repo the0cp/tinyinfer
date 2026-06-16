@@ -36,6 +36,11 @@ public:
         std::string output
     );
 
+    void validate(
+        const std::string& input_name,
+        const std::string& output_name
+    ) const;
+
     void execute();
 
     void execute_topological();

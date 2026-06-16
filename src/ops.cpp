@@ -218,6 +218,10 @@ Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
 
     const size_t n = b.shape()[1];
 
+    if(m == 0){
+        return Tensor({m, n});
+    }
+
     if(num_threads == 0){
         num_threads = 1;
     }
@@ -235,7 +239,7 @@ Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
     auto worker = [&](size_t row_begin, size_t row_end){
         for(size_t i = row_begin; i < row_end; i++){
             const float* a_row = a_data + i * k;
-            float* out_row = out_data + i * k;
+            float* out_row = out_data + i * n;
 
             for(size_t p = 0; p < k; p++){
                 const float a_val = a_row[p];

@@ -438,6 +438,88 @@ static void test_graph_residual_add() {
     }
 }
 
+static void test_graph_duplicate_node_name() {
+    Graph graph;
+
+    graph.add_node("same", OpType::ReLU, {"input"}, "a");
+    graph.add_node("same", OpType::ReLU, {"a"}, "b");
+
+    Tensor x({1, 1}, {1.0f});
+
+    bool caught = false;
+
+    try {
+        graph.forward("input", x, "b");
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+
+    if (!caught) {
+        throw std::runtime_error("duplicate node name test failed");
+    }
+}
+
+static void test_graph_duplicate_output() {
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "same_output");
+    graph.add_node("relu2", OpType::ReLU, {"input"}, "same_output");
+
+    Tensor x({1, 1}, {1.0f});
+
+    bool caught = false;
+
+    try {
+        graph.forward("input", x, "same_output");
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+
+    if (!caught) {
+        throw std::runtime_error("duplicate output test failed");
+    }
+}
+
+static void test_graph_wrong_input_count() {
+    Graph graph;
+
+    graph.add_node("add1", OpType::Add, {"input"}, "out");
+
+    Tensor x({1, 1}, {1.0f});
+
+    bool caught = false;
+
+    try {
+        graph.forward("input", x, "out");
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+
+    if (!caught) {
+        throw std::runtime_error("wrong input count test failed");
+    }
+}
+
+static void test_graph_missing_requested_output() {
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "real_output");
+
+    Tensor x({1, 1}, {1.0f});
+
+    bool caught = false;
+
+    try {
+        graph.forward("input", x, "not_exist_output");
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+
+    if (!caught) {
+        throw std::runtime_error("missing requested output test failed");
+    }
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -452,6 +534,10 @@ int main(){
     test_graph_execution_order();
     test_graph_missing_dependency();
     test_graph_residual_add();
+    test_graph_duplicate_node_name();
+    test_graph_duplicate_output();
+    test_graph_wrong_input_count();
+    test_graph_missing_requested_output();
 
     std::cout << "All tests passed.\n";
     return 0;

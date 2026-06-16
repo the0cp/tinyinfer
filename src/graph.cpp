@@ -1,8 +1,12 @@
 #include "graph.h"
 #include "ops.h"
 
+#include <iterator>
 #include <stdexcept>
 #include <sstream>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace tinyinfer{
 
@@ -40,6 +44,52 @@ std::string shape_to_string(const Tensor& tensor){
     oss << "]";
 
     return oss.str();
+}
+
+std::string set_to_string(const std::unordered_set<std::string>& values){
+    std::ostringstream oss;
+
+    oss << "{";
+
+    for(auto it = values.begin(); it != values.end(); it++){
+        oss << *it;
+        if(std::next(it) != values.end()){
+            oss << ", ";
+        }
+    }
+
+    oss << "}";
+    return oss.str();
+}
+
+std::vector<std::string> missing_inputs_for_node(
+    const Node& node,
+    const std::unordered_set<std::string>& available
+){
+    std::vector<std::string> missing;
+
+    for(const std::string& input : node.inputs){
+        if(!available.contains(input)){
+            missing.push_back(input);
+        }
+    }
+
+    return missing;
+}
+
+size_t expected_input_count(OpType op){
+    switch(op){
+        case OpType::Linear:
+            return 3;
+        case OpType::ReLU:
+            return 1;
+        case OpType::Add:
+            return 2;
+        case OpType::Softmax:
+            return 1;
+    }
+
+    return 0;
 }
 
 }
@@ -216,12 +266,155 @@ void Graph::execute(){
     }
 }
 
+void Graph::validate(
+    const std::string& input_name,
+    const std::string& output_name
+) const{
+    if(input_name.empty()){
+        throw std::runtime_error("Graph validation failed: input name is empty");
+    }
+
+    if(output_name.empty()){
+        throw std::runtime_error("Graph validation failed: output name is empty");
+    }
+
+    std::unordered_set<std::string> node_names;
+    std::unordered_map<std::string, std::string> output_writers;
+    std::unordered_set<std::string> node_outputs;
+
+    for(const Node& node : nodes_){
+        if(node.name.empty()){
+            throw std::runtime_error("Graph validation failed: node name is empty");
+        }
+
+        if(!node_names.insert(node.name).second){
+            throw std::runtime_error(
+                "Graph validation failed: duplicate node name '" + 
+                node.name + "'"
+            );
+        }
+
+        if(node.output.empty()){
+            throw std::runtime_error(
+                "Graph validation failed: node '" + 
+                node.name + "'" + "has empty output name"
+            );
+        }
+
+        const size_t expected = expected_input_count(node.op);
+
+        if(node.inputs.size() != expected){
+            throw std::runtime_error(
+                "Graph validation failed: node '" + 
+                node.name + "'" +
+                "(" + op_type_to_string(node.op) + ") expects " +
+                std::to_string(expected) + " inputs, got " +
+                std::to_string(node.inputs.size())
+            );
+        }
+
+        auto [it, inserted] = output_writers.emplace(node.output, node.name);
+
+        if(!inserted){
+            throw std::runtime_error(
+                "Graph validation failed: tensor '" + 
+                node.output + "' is written by multiple nodes: " +
+                "'" + it->second + "' and '" + node.name + "'"
+            );
+        }
+
+        node_outputs.insert(node.output);
+    }
+
+    std::unordered_set<std::string> available;
+
+    for(const auto& [name, tensor] : tensors_){
+        (void)tensor;
+
+        if(!node_outputs.contains(name)){
+            available.insert(name);
+        }
+    }
+
+    available.insert(input_name);
+
+    std::vector<bool> executed(nodes_.size(), false);
+    size_t executed_count = 0;
+
+    while(executed_count < nodes_.size()){
+        bool progress = false;
+
+        for(size_t i = 0; i < nodes_.size(); i++){
+            if(executed[i]){
+                continue;
+            }
+
+            const Node& node = nodes_[i];
+            const auto missing = missing_inputs_for_node(node, available);
+
+            if(!missing.empty()){
+                continue;
+            }
+
+            available.insert(node.output);
+            executed[i] = true;
+            executed_count++;
+            progress = true;
+        }
+
+        if(!progress){
+            std::ostringstream oss;
+
+            oss << "Graph validation failed: unresovled dependency or cycle\n";
+            oss << "Available tensors: " << set_to_string(available) << "\n";
+            oss << "Pending nodes: \n";
+
+            for(size_t i = 0; i < nodes_.size(); i++){
+                if(executed[i]){
+                    continue;
+                }
+
+                const Node& node = nodes_[i];
+                const auto missing = missing_inputs_for_node(node, available);
+
+                oss << "  "
+                    << node.name
+                    << ": "
+                    << op_type_to_string(node.op)
+                    << "("
+                    << join_strings(node.inputs)
+                    << ") ->"
+                    << node.output;
+
+                if(!missing.empty()){
+                    oss << ", missing: " << join_strings(missing);
+                }
+
+                oss << "\n";
+            }
+
+            oss << "\n" << dump();
+
+            throw std::runtime_error(oss.str());
+        } 
+    }
+
+    if(!available.contains(output_name)){
+        throw std::runtime_error(
+            "Graph validation failed: requested output '" +
+            output_name + "' is not produced by this graph"
+            );
+    }
+}
+
 Tensor Graph::forward(
     const std::string& input_name,
     const Tensor& input,
     const std::string& output_name
 ){
     set_tensor(input_name, input);
+
+    validate(input_name, output_name);
 
     execute_topological();
 
