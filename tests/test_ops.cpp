@@ -16,6 +16,15 @@ static void assert_close(float actual, float expected, float eps = 1e-4f){
     }
 }
 
+static void assert_shape(
+    const Shape& actual,
+    const Shape& expected
+){
+    if(actual != expected){
+        throw std::runtime_error("shape mismatch");
+    }
+}
+
 static void test_transpose_2d(){
     Tensor x({2, 3}, {
         1, 2, 3,
@@ -520,6 +529,127 @@ static void test_graph_missing_requested_output() {
     }
 }
 
+static void test_graph_shape_inference(){
+    Tensor w1({3, 4});
+    Tensor b1({4});
+    Tensor w2({4, 2});
+    Tensor b2({2});
+
+    Graph graph;
+
+    graph.set_tensor("w1", std::move(w1));
+    graph.set_tensor("b1", std::move(b1));
+    graph.set_tensor("w2", std::move(w2));
+    graph.set_tensor("b2", std::move(b2));
+
+    // 仍然故意乱序
+    graph.add_node(
+        "linear2",
+        OpType::Linear,
+        {"a1", "w2", "b2"},
+        "logits"
+    );
+
+    graph.add_node(
+        "relu1",
+        OpType::ReLU,
+        {"h1"},
+        "a1"
+    );
+
+    graph.add_node(
+        "linear1",
+        OpType::Linear,
+        {"input", "w1", "b1"},
+        "h1"
+    );
+
+    graph.validate("input", "logits");
+    graph.infer_shapes("input", {2, 3});
+
+    assert_shape(
+        graph.inferred_shape("input"),
+        {2, 3}
+    );
+
+    assert_shape(
+        graph.inferred_shape("h1"),
+        {2, 4}
+    );
+
+    assert_shape(
+        graph.inferred_shape("a1"),
+        {2, 4}
+    );
+
+    assert_shape(
+        graph.inferred_shape("logits"),
+        {2, 2}
+    );
+}
+
+static void test_graph_linear_shape_mismatch(){
+    Graph graph;
+
+    Tensor weight({4, 2});
+    Tensor bias({2});
+
+    graph.set_tensor("weight", std::move(weight));
+    graph.set_tensor("bias", std::move(bias));
+
+    graph.add_node(
+        "linear1",
+        OpType::Linear,
+        {"input", "weight", "bias"},
+        "output"
+    );
+
+    bool caught = false;
+
+    try{
+        graph.validate("input", "output");
+        graph.infer_shapes("input", {2, 3});
+    }catch(const std::runtime_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(
+            "linear shape mismatch test failed"
+        );
+    }
+}
+
+static void test_graph_add_shape_mismatch(){
+    Graph graph;
+
+    Tensor skip({2, 4});
+
+    graph.set_tensor("skip", std::move(skip));
+
+    graph.add_node(
+        "add1",
+        OpType::Add,
+        {"input", "skip"},
+        "output"
+    );
+
+    bool caught = false;
+
+    try{
+        graph.validate("input", "output");
+        graph.infer_shapes("input", {2, 3});
+    }catch(const std::runtime_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(
+            "add shape mismatch test failed"
+        );
+    }
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -538,6 +668,9 @@ int main(){
     test_graph_duplicate_output();
     test_graph_wrong_input_count();
     test_graph_missing_requested_output();
+    test_graph_shape_inference();
+    test_graph_linear_shape_mismatch();
+    test_graph_add_shape_mismatch();
 
     std::cout << "All tests passed.\n";
     return 0;

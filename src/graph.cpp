@@ -26,12 +26,10 @@ std::string join_strings(const std::vector<std::string>& values){
     return oss.str();
 }
 
-std::string shape_to_string(const Tensor& tensor){
+std::string shape_to_string(const Shape& shape){
     std::ostringstream oss;
 
     oss << "[";
-
-    const auto& shape = tensor.shape();
 
     for(size_t i = 0; i < shape.size(); i++){
         if(i > 0){
@@ -407,6 +405,179 @@ void Graph::validate(
     }
 }
 
+Shape Graph::infer_node_output_shape(
+    const Node& node,
+    const ShapeTable& shapes
+) const{
+    switch(node.op){
+        case OpType::Linear:{
+            const Shape& x = shapes.at(node.inputs[0]);
+            const Shape& weight = shapes.at(node.inputs[1]);
+            const Shape& bias = shapes.at(node.inputs[2]);
+
+            if(x.size() != 2){
+                throw std::runtime_error(
+                    "Shape inference failed: Linear node '" +
+                    node.name + "' expects input to be 2D, got " +
+                    shape_to_string(x)
+                );
+            }
+
+            if(weight.size() != 2){
+                throw std::runtime_error(
+                    "Shape inference failed: Linear node '" +
+                    node.name + "' expects weight to be 2D, got " +
+                    shape_to_string(weight)
+                );
+            }
+
+            if(bias.size() != 1){
+                throw std::runtime_error(
+                    "Shape inference failed: Linear node '" +
+                    node.name + "' expects bias to be 1D, got " +
+                    shape_to_string(bias)
+                );
+            }
+
+            if(x[1] != weight[0]){
+                throw std::runtime_error(
+                    "Shape inference failed: Linear node '" +
+                    node.name + "' cannot multiply input " +
+                    shape_to_string(x) + " by weight " +
+                    shape_to_string(weight)
+                );
+            }
+
+            if(weight[1] != bias[0]){
+                throw std::runtime_error(
+                    "Shape inference failed: Linear node '" +
+                    node.name + "' has weight output size " +
+                    std::to_string(weight[1]) +
+                    " but bias size " +
+                    std::to_string(bias[0])
+                );
+            }
+
+            return {x[0], weight[1]};
+        }
+        case OpType::Add:{
+            const Shape& a = shapes.at(node.inputs[0]);
+            const Shape& b = shapes.at(node.inputs[1]);
+
+            if(a != b){
+                throw std::runtime_error(
+                    "Shape inference failed: Add node '" +
+                    node.name + "' has incompatible inputs " +
+                    shape_to_string(a) + " and " +
+                    shape_to_string(b)
+                );
+            }
+
+            return a;
+        }
+        case OpType::ReLU:{
+            return shapes.at(node.inputs[0]);
+        }
+        case OpType::Softmax:{
+            const Shape& x = shapes.at(node.inputs[0]);
+
+            if(x.size() != 2){
+                throw std::runtime_error(
+                    "Shape inference failed: Softmax node '" +
+                    node.name + "' expects a 2D input, got " +
+                    shape_to_string(x)
+                );
+            }
+
+            if(x[1] == 0){
+                throw std::runtime_error(
+                    "Shape inference failed: Softmax node '" +
+                    node.name +
+                    "' has an empty feature dimension"
+                );
+            }
+
+            return x;
+        }
+    }
+
+    throw std::runtime_error("Shape inference failed: unsupported operator");
+}
+
+void Graph::infer_shapes(
+    const std::string& input_name,
+    const Shape& input_shape
+){
+    last_inferred_shapes_.clear();
+
+    ShapeTable shapes;
+    std::unordered_set<std::string> node_outputs;
+
+    for(const Node& node : nodes_){
+        node_outputs.insert(node.output);
+    }
+
+    for(const auto& [name, tensor] : tensors_){
+        if(!node_outputs.contains(name)){
+            shapes.emplace(name, tensor.shape());
+        }
+    }
+
+    shapes.insert_or_assign(input_name, input_shape);
+
+    std::vector<bool> inferred(nodes_.size(), false);
+    size_t inferred_count = 0;
+
+    while(inferred_count < nodes_.size()){
+        bool progress = false;
+
+        for(size_t i = 0; i < nodes_.size(); i++){
+            if(inferred[i]){
+                continue;
+            }
+
+            const Node& node = nodes_[i];
+
+            bool ready = true;
+
+            for(const std::string& input : node.inputs){
+                if(!shapes.contains(input)){
+                    ready = false;
+                    break;
+                }
+            }
+
+            if(!ready){
+                continue;
+            }
+
+            Shape output_shape = infer_node_output_shape(node, shapes);
+
+            shapes.insert_or_assign(node.output, std::move(output_shape));
+            
+            inferred[i] = true;
+            inferred_count++;
+            progress = true;
+        }
+
+        if(!progress){
+            throw std::runtime_error("Shape inference failed: unresolved dependency or cycle");
+        }
+    }
+
+    last_inferred_shapes_ = std::move(shapes);
+}
+
+const Shape& Graph::inferred_shape(const std::string& name) const{
+    auto it = last_inferred_shapes_.find(name);
+
+    if(it == last_inferred_shapes_.end()){
+        throw std::runtime_error("Inferred shape not found for tensor: " + name);
+    }
+
+    return it->second;
+}
+
 Tensor Graph::forward(
     const std::string& input_name,
     const Tensor& input,
@@ -415,6 +586,8 @@ Tensor Graph::forward(
     set_tensor(input_name, input);
 
     validate(input_name, output_name);
+
+    infer_shapes(input_name, input.shape());
 
     execute_topological();
 
@@ -493,9 +666,48 @@ std::string Graph::dump_tensors() const{
         oss << "  "
             << name
             << ": shape="
-            << shape_to_string(tensor)
+            << shape_to_string(tensor.shape())
             << ", numel="
             << tensor.numel()
+            << "\n";
+    }
+
+    return oss.str();
+}
+
+std::string Graph::dump_shapes() const{
+    std::ostringstream oss;
+
+    oss << "Graph shapes:\n";
+
+    if(last_inferred_shapes_.empty()){
+        oss << "  <not inferred>\n";
+        return oss.str();
+    }
+
+    for(const Node& node : nodes_){
+        oss << "  "
+            << node.name
+            << ": "
+            << op_type_to_string(node.op)
+            << "(";
+
+        for(size_t i = 0; i < node.inputs.size(); i++){
+            if(i > 0){
+                oss << ", ";
+            }
+
+            const std::string& input_name = node.inputs[i];
+
+            oss << input_name
+                << " "
+                << shape_to_string(inferred_shape(input_name));
+        }
+
+        oss << ") -> "
+            << node.output
+            << " "
+            << shape_to_string(inferred_shape(node.output))
             << "\n";
     }
 

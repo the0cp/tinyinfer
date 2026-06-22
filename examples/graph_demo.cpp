@@ -47,6 +47,7 @@ int main() {
 
     Tensor prob = graph.forward("input", x, "prob");
 
+    std::cout << graph.dump_shapes() << "\n";
     std::cout << graph.dump_execution_order() << "\n";
     std::cout << graph.dump_tensors() << "\n";
 
