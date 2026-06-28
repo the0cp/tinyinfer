@@ -8,11 +8,13 @@
 
 namespace tinyinfer{
 
+using Shape = std::vector<size_t>;
+
 class Tensor{
 public:
     Tensor() = delete;
-    explicit Tensor(std::vector<size_t> shape);
-    Tensor(std::vector<size_t> shape, std::vector<float> data);
+    explicit Tensor(Shape shape);
+    Tensor(Shape shape, std::vector<float> data);
 
     float& at(std::initializer_list<size_t> indices);
     const float& at(std::initializer_list<size_t> indices) const;
@@ -20,7 +22,7 @@ public:
     float* data();
     const float* data() const;
 
-    const std::vector<size_t>& shape() const;
+    const Shape& shape() const;
     const std::vector<size_t>& strides() const;
 
     size_t dim() const;
@@ -29,7 +31,7 @@ public:
     void fill(float value);
 
 private:
-    std::vector<size_t> shape_;
+    Shape shape_;
     std::vector<size_t> strides_;
     std::vector<float> data_;
 

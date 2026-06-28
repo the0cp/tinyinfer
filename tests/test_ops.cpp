@@ -1,6 +1,7 @@
 #include "ops.h"
 #include "module.h"
 #include "graph.h"
+#include "operator_registry.h"
 
 #include <cmath>
 #include <iostream>
@@ -650,6 +651,47 @@ static void test_graph_add_shape_mismatch(){
     }
 }
 
+static void test_operator_registry() {
+    OperatorRegistry registry;
+
+    const OperatorDefinition& linear =
+        registry.get(OpType::Linear);
+
+    if (linear.name != "Linear") {
+        throw std::runtime_error(
+            "Linear registry name mismatch"
+        );
+    }
+
+    if (linear.input_count != 3) {
+        throw std::runtime_error(
+            "Linear registry input count mismatch"
+        );
+    }
+
+    if (linear.execute == nullptr) {
+        throw std::runtime_error(
+            "Linear execution kernel is missing"
+        );
+    }
+
+    if (linear.infer_shape == nullptr) {
+        throw std::runtime_error(
+            "Linear shape kernel is missing"
+        );
+    }
+
+    const OperatorDefinition& add =
+        registry.get(OpType::Add);
+
+    if (add.name != "Add" ||
+        add.input_count != 2) {
+        throw std::runtime_error(
+            "Add registry metadata mismatch"
+        );
+    }
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -671,6 +713,7 @@ int main(){
     test_graph_shape_inference();
     test_graph_linear_shape_mismatch();
     test_graph_add_shape_mismatch();
+    test_operator_registry();
 
     std::cout << "All tests passed.\n";
     return 0;

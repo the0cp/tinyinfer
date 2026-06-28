@@ -1,13 +1,13 @@
 #include "tensor.h"
 
 namespace tinyinfer{
-Tensor::Tensor(std::vector<size_t> shape)
+Tensor::Tensor(Shape shape)
     : shape_(std::move(shape)){
     compute_strides();
     data_.resize(numel(), 0.0f);
 }
 
-Tensor::Tensor(std::vector<size_t> shape, std::vector<float> data)
+Tensor::Tensor(Shape shape, std::vector<float> data)
     : shape_(std::move(shape)), data_(std::move(data)){
     compute_strides();
 
@@ -57,7 +57,7 @@ const float& Tensor::at(std::initializer_list<size_t> indices) const{
     return data_[compute_offset(indices)];
 }
 
-const std::vector<size_t>& Tensor::shape() const{
+const Shape& Tensor::shape() const{
     return shape_;
 }
 

@@ -1,3 +1,4 @@
+#include "operator_registry.h"
 #include "graph.h"
 #include "ops.h"
 
@@ -75,36 +76,6 @@ std::vector<std::string> missing_inputs_for_node(
     return missing;
 }
 
-size_t expected_input_count(OpType op){
-    switch(op){
-        case OpType::Linear:
-            return 3;
-        case OpType::ReLU:
-            return 1;
-        case OpType::Add:
-            return 2;
-        case OpType::Softmax:
-            return 1;
-    }
-
-    return 0;
-}
-
-}
-
-const char* op_type_to_string(OpType op){
-    switch(op){
-        case OpType::Linear:
-            return "Linear";
-        case OpType::ReLU:
-            return "ReLU";
-        case OpType::Softmax:
-            return "Softmax";
-        case OpType::Add:
-            return "Add";
-    }
-
-    return "Unknown";
 }
 
 void Graph::set_tensor(std::string name, Tensor tensor){
@@ -152,67 +123,30 @@ const std::vector<std::string>& Graph::last_execution_order() const{
 }
 
 void Graph::execute_node(const Node& node){
-    switch(node.op){
-        case OpType::Linear:{
-            if(node.inputs.size() != 3){
-                throw std::runtime_error(
-                    "Linear node expects 3 inputs: x, weight, bias"
-                );
-            }
+    const OperatorDefinition& definition = registry_.get(node.op);
 
-            const Tensor& x = get_tensor_or_throw(node.inputs[0]);
-            const Tensor& weight = get_tensor_or_throw(node.inputs[1]);
-            const Tensor& bias = get_tensor_or_throw(node.inputs[2]);
+    TensorInputs inputs;
+    inputs.reserve(node.inputs.size());
 
-            Tensor out = linear(x, weight, bias);
+    for(const std::string& input_name : node.inputs){
+        const Tensor& input = get_tensor_or_throw(input_name);
+        inputs.push_back(&input);
+    }
 
-            set_tensor(node.output, std::move(out));
-            break;
-        }
-        case OpType::ReLU:{
-            if(node.inputs.size() != 1){
-                throw std::runtime_error(
-                    "ReLU node expects 1 input"
-                );
-            }
+    try{
+        Tensor output = definition.execute(inputs);
 
-            const Tensor& x = get_tensor_or_throw(node.inputs[0]);
-
-            Tensor out = relu(x);
-
-            set_tensor(node.output, std::move(out));
-            break;
-        }
-        case OpType::Softmax:{
-            if(node.inputs.size() != 1){
-                throw std::runtime_error(
-                    "Softmax node expects 1 input"
-                );
-            }
-
-            const Tensor& x = get_tensor_or_throw(node.inputs[0]);
-
-            Tensor out = softmax(x);
-
-            set_tensor(node.output, std::move(out));
-            break;
-        }
-        case OpType::Add:{
-            if(node.inputs.size() != 2){
-                throw std::runtime_error(
-                    "Add node '" + node.name +
-                    "' expects 2 inputs"
-                );
-            }
-
-            const Tensor& a = get_tensor_or_throw(node.inputs[0]);
-            const Tensor& b = get_tensor_or_throw(node.inputs[1]);
-
-            Tensor out = add(a, b);
-
-            set_tensor(node.output, std::move(out));
-            break;
-        }
+        set_tensor(
+            node.output,
+            std::move(output)
+        );
+    }catch(const std::exception& error){
+        throw std::runtime_error(
+            "Execution failed at node '" +
+            node.name + "' (" +
+            definition.name + "): " +
+            error.what()
+        );
     }
 }
 
@@ -299,13 +233,15 @@ void Graph::validate(
             );
         }
 
-        const size_t expected = expected_input_count(node.op);
+        const OperatorDefinition& definition = registry_.get(node.op);
+
+        const size_t expected = definition.input_count;
 
         if(node.inputs.size() != expected){
             throw std::runtime_error(
                 "Graph validation failed: node '" + 
                 node.name + "'" +
-                "(" + op_type_to_string(node.op) + ") expects " +
+                "(" + definition.name + ") expects " +
                 std::to_string(expected) + " inputs, got " +
                 std::to_string(node.inputs.size())
             );
@@ -375,10 +311,12 @@ void Graph::validate(
                 const Node& node = nodes_[i];
                 const auto missing = missing_inputs_for_node(node, available);
 
+                const OperatorDefinition& definition = registry_.get(node.op);
+
                 oss << "  "
                     << node.name
                     << ": "
-                    << op_type_to_string(node.op)
+                    << definition.name
                     << "("
                     << join_strings(node.inputs)
                     << ") ->"
@@ -409,99 +347,29 @@ Shape Graph::infer_node_output_shape(
     const Node& node,
     const ShapeTable& shapes
 ) const{
-    switch(node.op){
-        case OpType::Linear:{
-            const Shape& x = shapes.at(node.inputs[0]);
-            const Shape& weight = shapes.at(node.inputs[1]);
-            const Shape& bias = shapes.at(node.inputs[2]);
+    const OperatorDefinition& definition = registry_.get(node.op);
 
-            if(x.size() != 2){
-                throw std::runtime_error(
-                    "Shape inference failed: Linear node '" +
-                    node.name + "' expects input to be 2D, got " +
-                    shape_to_string(x)
-                );
-            }
+    ShapeInputs input_shapes;
+    input_shapes.reserve(node.inputs.size());
 
-            if(weight.size() != 2){
-                throw std::runtime_error(
-                    "Shape inference failed: Linear node '" +
-                    node.name + "' expects weight to be 2D, got " +
-                    shape_to_string(weight)
-                );
-            }
+    for(const std::string& input_name : node.inputs){
+        auto it = shapes.find(input_name);
 
-            if(bias.size() != 1){
-                throw std::runtime_error(
-                    "Shape inference failed: Linear node '" +
-                    node.name + "' expects bias to be 1D, got " +
-                    shape_to_string(bias)
-                );
-            }
-
-            if(x[1] != weight[0]){
-                throw std::runtime_error(
-                    "Shape inference failed: Linear node '" +
-                    node.name + "' cannot multiply input " +
-                    shape_to_string(x) + " by weight " +
-                    shape_to_string(weight)
-                );
-            }
-
-            if(weight[1] != bias[0]){
-                throw std::runtime_error(
-                    "Shape inference failed: Linear node '" +
-                    node.name + "' has weight output size " +
-                    std::to_string(weight[1]) +
-                    " but bias size " +
-                    std::to_string(bias[0])
-                );
-            }
-
-            return {x[0], weight[1]};
+        if(it == shapes.end()){
+            throw std::runtime_error(
+                "Shape for tensor '" +
+                input_name +
+                "' is not available"
+            );
         }
-        case OpType::Add:{
-            const Shape& a = shapes.at(node.inputs[0]);
-            const Shape& b = shapes.at(node.inputs[1]);
 
-            if(a != b){
-                throw std::runtime_error(
-                    "Shape inference failed: Add node '" +
-                    node.name + "' has incompatible inputs " +
-                    shape_to_string(a) + " and " +
-                    shape_to_string(b)
-                );
-            }
-
-            return a;
-        }
-        case OpType::ReLU:{
-            return shapes.at(node.inputs[0]);
-        }
-        case OpType::Softmax:{
-            const Shape& x = shapes.at(node.inputs[0]);
-
-            if(x.size() != 2){
-                throw std::runtime_error(
-                    "Shape inference failed: Softmax node '" +
-                    node.name + "' expects a 2D input, got " +
-                    shape_to_string(x)
-                );
-            }
-
-            if(x[1] == 0){
-                throw std::runtime_error(
-                    "Shape inference failed: Softmax node '" +
-                    node.name +
-                    "' has an empty feature dimension"
-                );
-            }
-
-            return x;
-        }
+        input_shapes.push_back(&it->second);
     }
 
-    throw std::runtime_error("Shape inference failed: unsupported operator");
+    return definition.infer_shape(
+        input_shapes,
+        node.name
+    );
 }
 
 void Graph::infer_shapes(
@@ -621,10 +489,11 @@ std::string Graph::dump() const{
     }
 
     for(const Node& node : nodes_){
+        const OperatorDefinition& definition = registry_.get(node.op);
         oss << "  "
             << node.name
             << ": "
-            << op_type_to_string(node.op)
+            << definition.name
             << "("
             << join_strings(node.inputs)
             << ") -> "
@@ -686,10 +555,11 @@ std::string Graph::dump_shapes() const{
     }
 
     for(const Node& node : nodes_){
+        const OperatorDefinition& definition = registry_.get(node.op);
         oss << "  "
             << node.name
             << ": "
-            << op_type_to_string(node.op)
+            << definition.name
             << "(";
 
         for(size_t i = 0; i < node.inputs.size(); i++){

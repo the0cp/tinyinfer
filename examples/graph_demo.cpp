@@ -1,3 +1,4 @@
+#include "operator_registry.h"
 #include "graph.h"
 
 #include <iostream>

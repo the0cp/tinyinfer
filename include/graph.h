@@ -1,5 +1,6 @@
 #pragma once
 
+#include "operator_registry.h"
 #include "tensor.h"
 
 #include <string>
@@ -9,17 +10,7 @@
 
 namespace tinyinfer{
 
-using Shape = std::vector<size_t>;
 using ShapeTable = std::unordered_map<std::string, Shape>;
-
-enum class OpType{
-    Linear,
-    ReLU,
-    Softmax,
-    Add
-};
-
-const char* op_type_to_string(OpType op);
 
 struct Node{
     std::string name;
@@ -74,6 +65,8 @@ public:
     const std::vector<std::string>& last_execution_order() const;
 
 private:
+    OperatorRegistry registry_;
+    
     std::unordered_map<std::string, Tensor> tensors_;
     std::vector<Node> nodes_;
     std::vector<std::string> last_execution_order_;
