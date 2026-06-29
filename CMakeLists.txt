@@ -11,6 +11,7 @@ add_library(tinyinfer
     src/thread_pool.cpp
     src/graph.cpp
     src/operator_registry.cpp
+    src/execution_plan.cpp
 )
 
 target_include_directories(tinyinfer PUBLIC include)

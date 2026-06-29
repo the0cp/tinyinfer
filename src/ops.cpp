@@ -122,6 +122,10 @@ Tensor fast_matmul(const Tensor& a, const Tensor& b){
 }
 
 Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
+    if(block_size == 0){
+        throw std::runtime_error("blocked_matmul requires a non-zero block size.");
+    }
+    
     if(a.dim() != 2 || b.dim() != 2){
         throw std::runtime_error("matmul only supports 2D tensors.");
     }
@@ -289,6 +293,10 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
 
     const size_t n = b.shape()[1];
 
+    if(m == 0){
+        return Tensor({m, n});
+    }
+
     if(num_tasks == 0){
         num_tasks = pool.size();
     }
@@ -380,6 +388,10 @@ Tensor softmax(const Tensor& x){
     const size_t features = x.shape()[1];
 
     Tensor out(x.shape());
+
+    if(features == 0){
+        throw std::runtime_error("softmax requires a non-empty feature dimension.");
+    }
 
     const float* x_data = x.data();
     float* out_data = out.data();

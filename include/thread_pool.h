@@ -7,6 +7,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <exception>
 
 namespace tinyinfer{
 
@@ -32,6 +33,11 @@ private:
 
     bool stop_ = false;
     size_t active_tasks_ = 0;
+
+    std::exception_ptr first_failure_;
+    static thread_local const ThreadPool* current_worker_pool_;
+
+    void wait_until_idle();
 
     void worker_loop();
 };

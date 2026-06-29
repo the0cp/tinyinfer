@@ -1,11 +1,11 @@
-#include "operator_registry.h"
 #include "graph.h"
 
 #include <iostream>
+#include <utility>
 
 using namespace tinyinfer;
 
-int main() {
+int main(){
     Tensor x({2, 3}, {
         1, -2, 3,
         4, -5, 6
@@ -32,9 +32,12 @@ int main() {
 
     std::cout << graph.dump() << "\n";
 
-    Tensor y = graph.forward("input", x, "output");
+    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
 
-    std::cout << graph.dump_execution_order() << "\n";
+    std::cout << graph.dump_plan(plan) << "\n";
+
+    Tensor y = graph.run(plan, x);
+
     std::cout << graph.dump_tensors() << "\n";
 
     std::cout << "Output:\n";

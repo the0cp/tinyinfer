@@ -1,8 +1,11 @@
 #include "thread_pool.h"
 
 #include <stdexcept>
+#include <utility>
 
 namespace tinyinfer{
+
+thread_local const ThreadPool* ThreadPool::current_worker_pool_ = nullptr;
 
 ThreadPool::ThreadPool(size_t num_threads){
     if(num_threads == 0){
@@ -19,11 +22,14 @@ ThreadPool::ThreadPool(size_t num_threads){
 }
 
 ThreadPool::~ThreadPool(){
-    wait();
+    try{
+        wait_until_idle();
+    }catch(...){}
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         stop_ = true;
+        first_failure_ = nullptr;
     }
 
     task_cv_.notify_all();
@@ -36,6 +42,10 @@ ThreadPool::~ThreadPool(){
 }
 
 void ThreadPool::enqueue(std::function<void()> task){
+    if(!task){
+        throw std::invalid_argument("Cannot enqueue an empty task.");
+    }
+
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -50,6 +60,30 @@ void ThreadPool::enqueue(std::function<void()> task){
 }
 
 void ThreadPool::wait(){
+     if(current_worker_pool_ == this){
+        throw std::logic_error(
+            "A worker cannot wait on its own ThreadPool."
+        );
+    }
+
+    std::exception_ptr failure;
+
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+
+        done_cv_.wait(lock, [this](){
+            return tasks_.empty() && active_tasks_ == 0;
+        });
+
+        failure = std::exchange(first_failure_, nullptr);
+    }
+
+    if(failure){
+        std::rethrow_exception(failure);
+    }
+}
+
+void ThreadPool::wait_until_idle(){
     std::unique_lock<std::mutex> lock(mutex_);
 
     done_cv_.wait(lock, [this](){
@@ -62,6 +96,8 @@ size_t ThreadPool::size() const{
 }
 
 void ThreadPool::worker_loop(){
+    current_worker_pool_ = this;
+    
     while(true){
         std::function<void()> task;
 
@@ -81,10 +117,20 @@ void ThreadPool::worker_loop(){
             active_tasks_++;
         }
 
-        task();
+        std::exception_ptr failure;
+
+        try{
+            task();
+        }catch(...){
+            failure = std::current_exception();
+        }
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
+
+            if(failure && !first_failure_){
+                first_failure_ = failure;
+            }
 
             active_tasks_--;
 
