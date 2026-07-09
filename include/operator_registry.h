@@ -52,12 +52,11 @@ public:
 
     const OperatorDefinition& get(OpType type) const;
 
+    OpType type_from_name(const std::string& name) const;
+
 private:
-    std::unordered_map<
-        OpType,
-        OperatorDefinition,
-        OpTypeHash
-    > definitions_;
+    std::unordered_map<OpType, OperatorDefinition, OpTypeHash> definitions_;
+    std::unordered_map<std::string, OpType> types_by_name_;
 };
 
 }

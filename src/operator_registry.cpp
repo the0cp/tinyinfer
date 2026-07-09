@@ -230,15 +230,30 @@ void OperatorRegistry::register_operator(
         );
     }
 
+    std::string name = definition.name;
+
     definitions_.emplace(
         type,
         std::move(definition)
     );
+
+    types_by_name_.emplace(
+        std::move(name),
+        type
+    );
 }
 
-const OperatorDefinition& OperatorRegistry::get(
-    OpType type
-) const{
+OpType OperatorRegistry::type_from_name(const std::string& name) const{
+    auto it = types_by_name_.find(name);
+
+    if(it == types_by_name_.end()){
+        throw std::runtime_error("Unknown operator: " + name);
+    }
+
+    return it->second;
+}
+
+const OperatorDefinition& OperatorRegistry::get(OpType type) const{
     auto it = definitions_.find(type);
 
     if(it == definitions_.end()){

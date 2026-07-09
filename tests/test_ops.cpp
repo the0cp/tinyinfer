@@ -2,6 +2,7 @@
 #include "module.h"
 #include "graph.h"
 #include "operator_registry.h"
+#include "model_loader.h"
 
 #include <cmath>
 #include <iostream>
@@ -10,6 +11,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <filesystem>
+#include <fstream>
 
 using namespace tinyinfer;
 
@@ -888,6 +891,169 @@ static void test_softmax_empty_features(){
     }
 }
 
+static void test_model_loader(){
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "tinyinfer_model_loader_test";
+
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    const std::filesystem::path weights_path = directory / "weights.bin";
+
+    {
+        std::ofstream weights(
+            weights_path,
+            std::ios::binary
+        );
+
+        const float data[] = {
+            2.0f, 3.0f,
+            1.0f
+        };
+
+        weights.write(
+            reinterpret_cast<const char*>(data),
+            sizeof(data)
+        );
+    }
+
+    const std::filesystem::path manifest_path = directory / "model.ti";
+
+    {
+        std::ofstream manifest(manifest_path);
+
+        manifest <<
+            "TINYINFER_MODEL 1\n"
+            "weights weights.bin\n"
+            "input input 2 1 2\n"
+            "output output\n"
+            "tensor weight f32 2 2 1 0 8\n"
+            "tensor bias f32 1 1 8 4\n"
+            "node linear1 Linear 3 "
+            "input weight bias output\n"
+            "end\n";
+    }
+
+    std::unique_ptr<LoadedModel> model = ModelLoader::load(manifest_path);
+
+    Tensor input({1, 2}, {
+        4.0f,
+        5.0f
+    });
+
+    Tensor output = model->run(input);
+
+    assert_shape(output.shape(), {1, 1});
+    assert_close(output.at({0, 0}), 24.0f);
+
+    const auto& order =
+        model->plan().execution_order();
+
+    if(order.size() != 1 || order[0] != "linear1"){
+        throw std::runtime_error(
+            "Loaded model execution order mismatch"
+        );
+    }
+
+    std::filesystem::remove_all(directory);
+}
+
+static void test_model_writer_round_trip(){
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "tinyinfer_model_writer_round_trip";
+
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    const std::filesystem::path manifest_path = directory / "model.ti";
+
+    ModelPackage package;
+    package.input_name = "input";
+    package.input_shape = {1, 2};
+    package.output_name = "output";
+
+    package.tensors.push_back(NamedTensor{
+        "weight",
+        Tensor({2, 1}, {2.0f, 3.0f})
+    });
+
+    package.tensors.push_back(NamedTensor{
+        "bias",
+        Tensor({1}, {1.0f})
+    });
+
+    package.nodes.push_back(NodeMetadata{
+        "linear1",
+        "Linear",
+        {"input", "weight", "bias"},
+        "output"
+    });
+
+    ModelWriter::save(package, manifest_path);
+
+    std::unique_ptr<LoadedModel> model = ModelLoader::load(manifest_path);
+
+    Tensor input({1, 2}, {4.0f, 5.0f});
+    Tensor output = model->run(input);
+
+    assert_shape(output.shape(), {1, 1});
+    assert_close(output.at({0, 0}), 24.0f);
+
+    const auto& order = model->plan().execution_order();
+
+    if(order.size() != 1 || order[0] != "linear1"){
+        throw std::runtime_error("round-trip execution order mismatch");
+    }
+
+    std::filesystem::remove_all(directory);
+}
+
+static void test_model_writer_creates_files(){
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "tinyinfer_model_writer_files";
+
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    const std::filesystem::path manifest_path = directory / "model.ti";
+    const std::filesystem::path weights_path = directory / "weights.bin";
+
+    ModelPackage package;
+    package.input_name = "input";
+    package.input_shape = {1, 1};
+    package.output_name = "output";
+
+    package.tensors.push_back(NamedTensor{
+        "weight",
+        Tensor({1, 1}, {2.0f})
+    });
+
+    package.tensors.push_back(NamedTensor{
+        "bias",
+        Tensor({1}, {1.0f})
+    });
+
+    package.nodes.push_back(NodeMetadata{
+        "linear1",
+        "Linear",
+        {"input", "weight", "bias"},
+        "output"
+    });
+
+    ModelWriter::save(package, manifest_path);
+
+    if(!std::filesystem::exists(manifest_path)){
+        throw std::runtime_error("model manifest was not created");
+    }
+
+    if(!std::filesystem::exists(weights_path)){
+        throw std::runtime_error("weights file was not created");
+    }
+
+    if(std::filesystem::file_size(weights_path) != 8){
+        throw std::runtime_error("weights file size mismatch");
+    }
+
+    std::filesystem::remove_all(directory);
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -920,6 +1086,9 @@ int main(){
     test_threadpool_matmul_zero_rows();
     test_blocked_matmul_zero_block();
     test_softmax_empty_features();
+    test_model_loader();
+    test_model_writer_round_trip();
+    test_model_writer_creates_files();
 
     std::cout << "All tests passed.\n";
     return 0;
