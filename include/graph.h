@@ -54,6 +54,7 @@ public:
     std::string dump() const;
     std::string dump_tensors() const;
     std::string dump_plan(const ExecutionPlan& plan) const;
+    std::string dump_memory_plan(const ExecutionPlan& plan) const;
 
 private:
     OperatorRegistry registry_;

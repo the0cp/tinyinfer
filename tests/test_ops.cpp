@@ -13,6 +13,7 @@
 #include <utility>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 
 using namespace tinyinfer;
 
@@ -31,6 +32,28 @@ static void assert_shape(
     if(actual != expected){
         throw std::runtime_error("shape mismatch");
     }
+}
+
+static void assert_lifetime(
+    const TensorMemoryInfo& info,
+    size_t produced_at,
+    size_t first_use,
+    size_t last_use,
+    const std::string& name
+){
+    if(info.produced_at != produced_at || info.first_use != first_use || info.last_use != last_use){
+        throw std::runtime_error("lifetime mismatch for tensor: " + name);
+    }
+}
+
+static const TensorMemoryInfo& find_memory_info(const ExecutionPlan& plan, const std::string& name){
+    for(const TensorMemoryInfo& info : plan.memory_infos()){
+        if(info.name == name){
+            return info;
+        }
+    }
+
+    throw std::runtime_error("memory info not found: " + name);
 }
 
 static std::filesystem::path reset_temp_dir(const std::string& name){
@@ -82,6 +105,51 @@ static void expect_model_load_failure(const std::filesystem::path& manifest_path
 
     if(!caught){
         throw std::runtime_error(test_name + " did not fail");
+    }
+}
+
+static void expect_model_write_failure(
+    const ModelPackage& package,
+    const std::filesystem::path& manifest_path,
+    const std::string& test_name
+){
+    bool caught = false;
+
+    try{
+        ModelWriter::save(package, manifest_path);
+    }catch(const std::exception&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(test_name + " did not fail");
+    }
+}
+
+static Tensor registry_dummy_execute(const TensorInputs&){
+    return Tensor({1}, {0.0f});
+}
+
+static Shape registry_dummy_infer_shape(const ShapeInputs&, const std::string&){
+    return {1};
+}
+
+
+static void test_tensor_shape_overflow(){
+    bool caught = false;
+
+    try{
+        Tensor too_large({
+            std::numeric_limits<size_t>::max(),
+            2
+        });
+        (void)too_large;
+    }catch(const std::runtime_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error("Tensor accepted an overflowing shape");
     }
 }
 
@@ -303,6 +371,59 @@ static void test_graph_forward(){
     assert_close(y.at({1, 1}), 23.3f);
 }
 
+static void test_graph_run_releases_unused_intermediates(){
+    Tensor x({1, 3}, {
+        -1.0f, 2.0f, 3.0f
+    });
+
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "hidden");
+    graph.add_node("relu2", OpType::ReLU, {"hidden"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
+    Tensor y = graph.run(plan, x);
+
+    assert_close(y.at({0, 0}), 0.0f);
+    assert_close(y.at({0, 1}), 2.0f);
+    assert_close(y.at({0, 2}), 3.0f);
+
+    if(graph.has_tensor("hidden")){
+        throw std::runtime_error("unused intermediate tensor was not released");
+    }
+
+    if(!graph.has_tensor("input") || !graph.has_tensor("output")){
+        throw std::runtime_error("runtime cleanup removed input or output tensor");
+    }
+}
+
+static void test_graph_run_keeps_intermediate_until_last_use(){
+    Tensor x({1, 3}, {
+        -1.0f, 2.0f, 3.0f
+    });
+
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "hidden");
+    graph.add_node("relu2", OpType::ReLU, {"hidden"}, "hidden2");
+    graph.add_node("add1", OpType::Add, {"hidden", "hidden2"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
+    Tensor y = graph.run(plan, x);
+
+    assert_close(y.at({0, 0}), 0.0f);
+    assert_close(y.at({0, 1}), 4.0f);
+    assert_close(y.at({0, 2}), 6.0f);
+
+    if(graph.has_tensor("hidden") || graph.has_tensor("hidden2")){
+        throw std::runtime_error("runtime cleanup kept a dead intermediate tensor");
+    }
+
+    if(!graph.has_tensor("input") || !graph.has_tensor("output")){
+        throw std::runtime_error("runtime cleanup removed input or output tensor");
+    }
+}
+
 static void test_graph_compile_topological_order(){
     Tensor w1({3, 4});
     Tensor b1({4});
@@ -401,6 +522,98 @@ static void test_execution_plan_shapes(){
        plan.output_name() != "logits"){
         throw std::runtime_error("ExecutionPlan endpoint mismatch");
     }
+}
+
+static void test_execution_plan_memory_infos(){
+    Graph graph;
+
+    graph.set_tensor("weight", Tensor({3, 2}));
+    graph.set_tensor("bias", Tensor({2}));
+
+    graph.add_node(
+        "linear1",
+        OpType::Linear,
+        {"input", "weight", "bias"},
+        "h1"
+    );
+
+    graph.add_node(
+        "relu1",
+        OpType::ReLU,
+        {"h1"},
+        "output"
+    );
+
+    ExecutionPlan plan = graph.compile("input", {4, 3}, "output");
+
+    if(plan.memory_infos().size() != 5){
+        throw std::runtime_error("ExecutionPlan memory info count mismatch");
+    }
+
+    const TensorMemoryInfo& input = find_memory_info(plan, "input");
+    assert_shape(input.shape, {4, 3});
+
+    if(input.numel != 12 || input.byte_size != 12 * sizeof(float) ||
+       !input.is_input || input.is_output || input.is_constant || input.is_intermediate){
+        throw std::runtime_error("input memory info mismatch");
+    }
+
+    assert_lifetime(input, tensor_lifetime_npos, 0, 0, "input");
+
+    const TensorMemoryInfo& weight = find_memory_info(plan, "weight");
+
+    if(weight.numel != 6 || weight.byte_size != 6 * sizeof(float) ||
+       weight.is_input || weight.is_output || !weight.is_constant || weight.is_intermediate){
+        throw std::runtime_error("constant memory info mismatch");
+    }
+
+    assert_lifetime(weight, tensor_lifetime_npos, 0, 0, "weight");
+
+    const TensorMemoryInfo& h1 = find_memory_info(plan, "h1");
+
+    if(h1.numel != 8 || h1.byte_size != 8 * sizeof(float) ||
+       h1.is_input || h1.is_output || h1.is_constant || !h1.is_intermediate){
+        throw std::runtime_error("intermediate memory info mismatch");
+    }
+
+    assert_lifetime(h1, 0, 1, 1, "h1");
+
+    const TensorMemoryInfo& output = find_memory_info(plan, "output");
+
+    if(output.numel != 8 || output.byte_size != 8 * sizeof(float) ||
+       output.is_input || !output.is_output || output.is_constant || output.is_intermediate){
+        throw std::runtime_error("output memory info mismatch");
+    }
+
+    assert_lifetime(output, 1, tensor_lifetime_npos, tensor_lifetime_npos, "output");
+}
+
+static void test_execution_plan_lifetime_multi_use(){
+    Graph graph;
+
+    graph.add_node(
+        "relu1",
+        OpType::ReLU,
+        {"input"},
+        "hidden"
+    );
+
+    graph.add_node(
+        "add1",
+        OpType::Add,
+        {"input", "hidden"},
+        "output"
+    );
+
+    ExecutionPlan plan = graph.compile("input", {2, 3}, "output");
+
+    const TensorMemoryInfo& input = find_memory_info(plan, "input");
+    const TensorMemoryInfo& hidden = find_memory_info(plan, "hidden");
+    const TensorMemoryInfo& output = find_memory_info(plan, "output");
+
+    assert_lifetime(input, tensor_lifetime_npos, 0, 1, "input");
+    assert_lifetime(hidden, 0, 1, 1, "hidden");
+    assert_lifetime(output, 1, tensor_lifetime_npos, tensor_lifetime_npos, "output");
 }
 
 static void test_execution_plan_invalidation(){
@@ -771,6 +984,35 @@ static void test_graph_dump_plan(){
     }
 }
 
+static void test_graph_dump_memory_plan(){
+    Graph graph;
+
+    graph.set_tensor("weight", Tensor({3, 2}));
+    graph.set_tensor("bias", Tensor({2}));
+
+    graph.add_node(
+        "linear1",
+        OpType::Linear,
+        {"input", "weight", "bias"},
+        "hidden"
+    );
+
+    graph.add_node(
+        "relu1",
+        OpType::ReLU,
+        {"hidden"},
+        "output"
+    );
+
+    ExecutionPlan plan = graph.compile(
+        "input",
+        {4, 3},
+        "output"
+    );
+
+    graph.dump_memory_plan(plan);
+}
+
 static void test_operator_registry() {
     OperatorRegistry registry;
 
@@ -808,6 +1050,28 @@ static void test_operator_registry() {
         add.input_count != 2) {
         throw std::runtime_error(
             "Add registry metadata mismatch"
+        );
+    }
+
+    bool caught_duplicate_name = false;
+
+    try{
+        registry.register_operator(
+            static_cast<OpType>(1000),
+            OperatorDefinition{
+                "ReLU",
+                1,
+                registry_dummy_execute,
+                registry_dummy_infer_shape
+            }
+        );
+    }catch(const std::runtime_error&){
+        caught_duplicate_name = true;
+    }
+
+    if(!caught_duplicate_name){
+        throw std::runtime_error(
+            "OperatorRegistry accepted a duplicate operator name"
         );
     }
 }
@@ -1285,6 +1549,95 @@ static void test_model_writer_duplicate_tensor(){
     std::filesystem::remove_all(dir);
 }
 
+static ModelPackage valid_writer_package(){
+    ModelPackage package;
+    package.input_name = "input";
+    package.input_shape = {1, 1};
+    package.output_name = "output";
+
+    package.tensors.push_back(NamedTensor{
+        "weight",
+        Tensor({1, 1}, {1.0f})
+    });
+
+    package.nodes.push_back(NodeMetadata{
+        "relu1",
+        "ReLU",
+        {"input"},
+        "output"
+    });
+
+    return package;
+}
+
+static void test_model_writer_invalid_names(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_writer_invalid_names");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.input_name.clear();
+        expect_model_write_failure(package, manifest_path, "empty input name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.output_name.clear();
+        expect_model_write_failure(package, manifest_path, "empty output name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.tensors[0].name.clear();
+        expect_model_write_failure(package, manifest_path, "empty tensor name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.nodes[0].name.clear();
+        expect_model_write_failure(package, manifest_path, "empty node name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.nodes[0].op_name.clear();
+        expect_model_write_failure(package, manifest_path, "empty node op name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.nodes[0].inputs[0].clear();
+        expect_model_write_failure(package, manifest_path, "empty node input name");
+    }
+
+    {
+        ModelPackage package = valid_writer_package();
+        package.nodes[0].output.clear();
+        expect_model_write_failure(package, manifest_path, "empty node output name");
+    }
+
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_writer_empty_weights_filename(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_writer_empty_weights_filename");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+
+    bool caught = false;
+
+    try{
+        ModelWriter::save(valid_writer_package(), manifest_path, "");
+    }catch(const std::exception&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error("ModelWriter accepted an empty weights filename");
+    }
+
+    std::filesystem::remove_all(dir);
+}
+
 static void test_model_loader_missing_weights_file(){
     const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_missing_weights");
     const std::filesystem::path manifest_path = dir / "model.ti";
@@ -1303,6 +1656,7 @@ static void test_model_loader_missing_weights_file(){
 }
 
 int main(){
+    test_tensor_shape_overflow();
     test_transpose_2d();
     test_naive_matmul();
     test_matmul_transposed_b();
@@ -1311,9 +1665,12 @@ int main(){
     test_softmax();
     test_sequential_forward();
     test_graph_forward();
+    test_graph_run_releases_unused_intermediates();
+    test_graph_run_keeps_intermediate_until_last_use();
     test_graph_compile_topological_order();
     test_execution_plan_reuse();
     test_execution_plan_shapes();
+    test_execution_plan_memory_infos();
     test_execution_plan_invalidation();
     test_execution_plan_wrong_graph();
     test_execution_plan_input_shape_mismatch();
@@ -1327,6 +1684,7 @@ int main(){
     test_graph_add_shape_mismatch();
     test_graph_constant_name_collision();
     test_graph_dump_plan();
+    test_graph_dump_memory_plan();
     test_operator_registry();
     test_thread_pool_tasks();
     test_thread_pool_exception();
@@ -1345,6 +1703,8 @@ int main(){
     test_model_loader_node_input_count_mismatch();
     test_model_loader_shape_mismatch();
     test_model_writer_duplicate_tensor();
+    test_model_writer_invalid_names();
+    test_model_writer_empty_weights_filename();
     test_model_loader_missing_weights_file();
 
     std::cout << "All tests passed.\n";

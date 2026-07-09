@@ -35,6 +35,9 @@ add_executable(test_ops
 
 target_link_libraries(test_ops PRIVATE tinyinfer)
 
+enable_testing()
+add_test(NAME test_ops COMMAND test_ops)
+
 add_executable(bench_matmul
     benchmark/bench_matmul.cpp
 )

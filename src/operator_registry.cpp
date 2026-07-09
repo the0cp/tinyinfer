@@ -230,6 +230,13 @@ void OperatorRegistry::register_operator(
         );
     }
 
+    if(types_by_name_.contains(definition.name)){
+        throw std::runtime_error(
+            "Operator name is already registered: " +
+            definition.name
+        );
+    }
+
     std::string name = definition.name;
 
     definitions_.emplace(

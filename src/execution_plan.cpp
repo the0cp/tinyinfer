@@ -33,6 +33,10 @@ const std::vector<std::string>& ExecutionPlan::execution_order() const noexcept{
     return execution_order_;
 }
 
+const std::vector<TensorMemoryInfo>& ExecutionPlan::memory_infos() const noexcept{
+    return memory_infos_;
+}
+
 size_t ExecutionPlan::node_count() const noexcept{
     return node_indices_.size();
 }

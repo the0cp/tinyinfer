@@ -35,6 +35,7 @@ int main(){
     ExecutionPlan plan = graph.compile("input", x.shape(), "output");
 
     std::cout << graph.dump_plan(plan) << "\n";
+    std::cout << graph.dump_memory_plan(plan) << "\n";
 
     Tensor y = graph.run(plan, x);
 

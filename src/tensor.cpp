@@ -1,6 +1,28 @@
 #include "tensor.h"
 
+#include <algorithm>
+#include <limits>
+
 namespace tinyinfer{
+
+namespace{
+
+size_t checked_numel(const Shape& shape){
+    size_t total = 1;
+
+    for(size_t dim : shape){
+        if(dim != 0 && total > std::numeric_limits<size_t>::max() / dim){
+            throw std::runtime_error("Tensor element count overflows size_t.");
+        }
+
+        total *= dim;
+    }
+
+    return total;
+}
+
+}
+
 Tensor::Tensor(Shape shape)
     : shape_(std::move(shape)){
     compute_strides();
@@ -25,7 +47,14 @@ void Tensor::compute_strides(){
     size_t stride = 1;
     for(size_t i = shape_.size(); i-- > 0;){
         strides_[i] = stride;
-        stride *= shape_[i];
+
+        const size_t dim = shape_[i];
+
+        if(dim != 0 && stride > std::numeric_limits<size_t>::max() / dim){
+            throw std::runtime_error("Tensor stride overflows size_t.");
+        }
+
+        stride *= dim;
     }
 }
 
@@ -78,11 +107,7 @@ size_t Tensor::dim() const{
 }
 
 size_t Tensor::numel() const{
-    size_t total = 1;
-    for(size_t s : shape_){
-        total *= s;
-    }
-    return total;
+    return checked_numel(shape_);
 }
 
 void Tensor::fill(float value){

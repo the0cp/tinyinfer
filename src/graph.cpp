@@ -1,5 +1,7 @@
 #include "graph.h"
 
+#include <algorithm>
+#include <limits>
 #include <iterator>
 #include <stdexcept>
 #include <sstream>
@@ -25,6 +27,50 @@ std::string join_strings(const std::vector<std::string>& values){
     return oss.str();
 }
 
+size_t checked_shape_numel(const Shape& shape){
+    size_t total = 1;
+
+    for(size_t dim : shape){
+        if(dim != 0 && total > std::numeric_limits<size_t>::max() / dim){
+            throw std::runtime_error("Shape element count overflows size_t.");
+        }
+
+        total *= dim;
+    }
+
+    return total;
+}
+
+size_t checked_byte_size(size_t numel){
+    if(numel > std::numeric_limits<size_t>::max() / sizeof(float)){
+        throw std::runtime_error("Tensor byte size overflows size_t.");
+    }
+
+    return numel * sizeof(float);
+}
+
+TensorMemoryInfo make_memory_info(
+    std::string name,
+    const Shape& shape,
+    bool is_input,
+    bool is_output,
+    bool is_constant
+){
+    const size_t numel = checked_shape_numel(shape);
+
+    TensorMemoryInfo info;
+    info.name = std::move(name);
+    info.shape = shape;
+    info.numel = numel;
+    info.byte_size = checked_byte_size(numel);
+    info.is_input = is_input;
+    info.is_output = is_output;
+    info.is_constant = is_constant;
+    info.is_intermediate = !is_input && !is_output && !is_constant;
+
+    return info;
+}
+
 std::string shape_to_string(const Shape& shape){
     std::ostringstream oss;
 
@@ -41,6 +87,68 @@ std::string shape_to_string(const Shape& shape){
     oss << "]";
 
     return oss.str();
+}
+
+std::string memory_role_string(const TensorMemoryInfo& info){
+    if(info.is_input){
+        return "input";
+    }
+
+    if(info.is_output){
+        return "output";
+    }
+
+    if(info.is_constant){
+        return "constant";
+    }
+
+    return "intermediate";
+}
+
+std::string lifetime_index_to_string(size_t index){
+    if(index == tensor_lifetime_npos){
+        return "-";
+    }
+
+    return std::to_string(index);
+}
+
+void update_tensor_use(
+    std::vector<TensorMemoryInfo>& memory_infos,
+    const std::unordered_map<std::string, size_t>& memory_info_indices,
+    const std::string& tensor_name,
+    size_t node_position
+){
+    auto it = memory_info_indices.find(tensor_name);
+
+    if(it == memory_info_indices.end()){
+        throw std::logic_error(
+            "ExecutionPlan memory analysis missing tensor '" + tensor_name + "'."
+        );
+    }
+
+    TensorMemoryInfo& info = memory_infos.at(it->second);
+
+    if(info.first_use == tensor_lifetime_npos){
+        info.first_use = node_position;
+    }
+
+    info.last_use = node_position;
+}
+
+const TensorMemoryInfo& find_memory_info_or_throw(
+    const ExecutionPlan& plan,
+    const std::string& tensor_name
+){
+    for(const TensorMemoryInfo& info : plan.memory_infos()){
+        if(info.name == tensor_name){
+            return info;
+        }
+    }
+
+    throw std::logic_error(
+        "ExecutionPlan memory cleanup missing tensor '" + tensor_name + "'."
+    );
 }
 
 }
@@ -154,12 +262,24 @@ Tensor Graph::run(
 
     store_runtime_tensor(plan.input_name_, input);
 
-    for(size_t node_index : plan.node_indices_){
+    for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
+        const size_t node_index = plan.node_indices_[node_position];
+
         if(node_index >= nodes_.size()){
             throw std::logic_error("ExecutionPlan contains an invalid node.");
         }
 
-        execute_node(nodes_[node_index]);
+        const Node& node = nodes_[node_index];
+
+        execute_node(node);
+
+        for(const std::string& input_name : node.inputs){
+            const TensorMemoryInfo& info = find_memory_info_or_throw(plan, input_name);
+
+            if(info.is_intermediate && info.last_use == node_position){
+                workspace_.erase(input_name);
+            }
+        }
     }
 
     return tensor(plan.output_name_);
@@ -395,6 +515,83 @@ ExecutionPlan Graph::compile(
 
     plan.shapes_ = std::move(shapes);
 
+    plan.memory_infos_.push_back(make_memory_info(
+        plan.input_name_,
+        plan.shape(plan.input_name_),
+        true,
+        plan.input_name_ == plan.output_name_,
+        false
+    )); // input 
+
+    std::vector<std::string> constant_names;
+    constant_names.reserve(constants_.size());
+
+    // Add constant tensors to memory info
+    for(const auto& [name, tensor] : constants_){
+        (void)tensor;
+        constant_names.push_back(name);
+    }
+
+    // Sort constant names to ensure deterministic order in memory info
+    std::sort(constant_names.begin(), constant_names.end());
+
+    // Add constant tensors to memory info
+    for(const std::string& name : constant_names){
+        plan.memory_infos_.push_back(make_memory_info(
+            name,
+            plan.shape(name),
+            false,
+            name == plan.output_name_,
+            true
+        ));
+    }
+
+    // Add intermediate tensors to memory info
+    for(size_t node_index : plan.node_indices_){
+        const Node& node = nodes_[node_index];
+
+        plan.memory_infos_.push_back(make_memory_info(
+            node.output,
+            plan.shape(node.output),
+            false,
+            node.output == plan.output_name_,
+            false
+        ));
+    }
+
+    std::unordered_map<std::string, size_t> memory_info_indices;
+    memory_info_indices.reserve(plan.memory_infos_.size());
+
+    for(size_t i = 0; i < plan.memory_infos_.size(); i++){
+        const std::string& name = plan.memory_infos_[i].name;
+        auto [it, inserted] = memory_info_indices.emplace(name, i);
+        (void)it;
+
+        if(!inserted){
+            throw std::logic_error(
+                "ExecutionPlan memory analysis found duplicate tensor '" + name + "'."
+            );
+        }
+    }
+
+    for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
+        const Node& node = nodes_.at(plan.node_indices_[node_position]);
+
+        auto output_it = memory_info_indices.find(node.output);
+
+        if(output_it == memory_info_indices.end()){
+            throw std::logic_error(
+                "ExecutionPlan memory analysis missing output tensor '" + node.output + "'."
+            );
+        }
+
+        plan.memory_infos_.at(output_it->second).produced_at = node_position;
+
+        for(const std::string& input : node.inputs){
+            update_tensor_use(plan.memory_infos_, memory_info_indices, input, node_position);
+        }
+    }
+
     return plan;
 }
 
@@ -503,6 +700,59 @@ std::string Graph::dump_plan(const ExecutionPlan& plan) const{
         oss << ") -> " << node.output << " "
             << shape_to_string(plan.shape(node.output)) << "\n";
     }
+
+    return oss.str();
+}
+
+std::string Graph::dump_memory_plan(const ExecutionPlan& plan) const{
+    if(plan.owner_ != this){
+        throw std::runtime_error(
+            "ExecutionPlan belongs to another Graph"
+        );
+    }
+
+    if(plan.graph_revision_ != revision_){
+        throw std::runtime_error(
+            "Cannot dump a stale ExecutionPlan"
+        );
+    }
+
+    size_t input_bytes = 0;
+    size_t constant_bytes = 0;
+    size_t intermediate_bytes = 0;
+    size_t output_bytes = 0;
+
+    std::ostringstream oss;
+    oss << "Memory plan:\n";
+    oss << "  tensors:\n";
+
+    for(const TensorMemoryInfo& info : plan.memory_infos_){
+        oss << "    " << info.name
+            << ": shape=" << shape_to_string(info.shape)
+            << ", numel=" << info.numel
+            << ", bytes=" << info.byte_size
+            << ", role=" << memory_role_string(info)
+            << ", produced_at=" << lifetime_index_to_string(info.produced_at)
+            << ", first_use=" << lifetime_index_to_string(info.first_use)
+            << ", last_use=" << lifetime_index_to_string(info.last_use) 
+            << "\n";
+        
+        if(info.is_input){
+            input_bytes += info.byte_size;
+        }else if(info.is_output){
+            output_bytes += info.byte_size;
+        }else if(info.is_constant){
+            constant_bytes += info.byte_size;
+        }else if(info.is_intermediate){
+            intermediate_bytes += info.byte_size;
+        }
+    }
+
+    oss << "  memory usage:\n";
+    oss << "    input: " << input_bytes << " bytes\n";
+    oss << "    constant: " << constant_bytes << " bytes\n";
+    oss << "    intermediate: " << intermediate_bytes << " bytes\n";
+    oss << "    output: " << output_bytes << " bytes\n";
 
     return oss.str();
 }

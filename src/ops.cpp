@@ -375,7 +375,7 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
 }
 
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
-    Tensor y = naive_matmul(x, weight);
+    Tensor y = fast_matmul(x, weight);
     return add_bias(y, bias);
 }
 
