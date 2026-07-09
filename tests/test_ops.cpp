@@ -33,6 +33,58 @@ static void assert_shape(
     }
 }
 
+static std::filesystem::path reset_temp_dir(const std::string& name){
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / name;
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    return dir;
+}
+
+static void write_text_file(const std::filesystem::path& path, const std::string& text){
+    std::ofstream file(path);
+
+    if(!file){
+        throw std::runtime_error("failed to open text file for writing: " + path.string());
+    }
+
+    file << text;
+
+    if(!file){
+        throw std::runtime_error("failed to write text file: " + path.string());
+    }
+}
+
+static void write_float_weights(const std::filesystem::path& path, const std::vector<float>& values){
+    std::ofstream file(path, std::ios::binary);
+
+    if(!file){
+        throw std::runtime_error("failed to open weights file for writing: " + path.string());
+    }
+
+    if(!values.empty()){
+        file.write(reinterpret_cast<const char*>(values.data()), static_cast<std::streamsize>(values.size() * sizeof(float)));
+    }
+
+    if(!file){
+        throw std::runtime_error("failed to write weights file: " + path.string());
+    }
+}
+
+static void expect_model_load_failure(const std::filesystem::path& manifest_path, const std::string& test_name){
+    bool caught = false;
+
+    try{
+        std::unique_ptr<LoadedModel> model = ModelLoader::load(manifest_path);
+        (void)model;
+    }catch(const std::exception&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(test_name + " did not fail");
+    }
+}
+
 static void test_transpose_2d(){
     Tensor x({2, 3}, {
         1, 2, 3,
@@ -1054,6 +1106,202 @@ static void test_model_writer_creates_files(){
     std::filesystem::remove_all(directory);
 }
 
+static void test_model_loader_unknown_operator(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_unknown_operator");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 1\n"
+        "output output\n"
+        "node bad MysteryOp 1 input output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "unknown operator model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_short_weights_file(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_short_weights");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {2.0f});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 2\n"
+        "output output\n"
+        "tensor weight f32 2 2 1 0 8\n"
+        "tensor bias f32 1 1 8 4\n"
+        "node linear1 Linear 3 input weight bias output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "short weights file model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_tensor_byte_size_mismatch(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_tensor_byte_size");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {2.0f, 3.0f, 1.0f});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 2\n"
+        "output output\n"
+        "tensor weight f32 2 2 1 0 4\n"
+        "tensor bias f32 1 1 8 4\n"
+        "node linear1 Linear 3 input weight bias output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "tensor byte size mismatch model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_missing_end(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_missing_end");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {2.0f, 3.0f, 1.0f});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 2\n"
+        "output output\n"
+        "tensor weight f32 2 2 1 0 8\n"
+        "tensor bias f32 1 1 8 4\n"
+        "node linear1 Linear 3 input weight bias output\n"
+    );
+
+    expect_model_load_failure(manifest_path, "missing end model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_content_after_end(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_content_after_end");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 1\n"
+        "output output\n"
+        "node relu1 ReLU 1 input output\n"
+        "end\n"
+        "node extra ReLU 1 input other\n"
+    );
+
+    expect_model_load_failure(manifest_path, "content after end model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_node_input_count_mismatch(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_node_input_count");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {2.0f, 3.0f, 1.0f});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 2\n"
+        "output output\n"
+        "tensor weight f32 2 2 1 0 8\n"
+        "tensor bias f32 1 1 8 4\n"
+        "node linear1 Linear 2 input weight bias output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "node input count mismatch model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_shape_mismatch(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_shape_mismatch");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+    const std::filesystem::path weights_path = dir / "weights.bin";
+
+    write_float_weights(weights_path, {1.0f, 2.0f, 3.0f, 0.0f});
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights weights.bin\n"
+        "input input 2 1 2\n"
+        "output output\n"
+        "tensor weight f32 2 3 1 0 12\n"
+        "tensor bias f32 1 1 12 4\n"
+        "node linear1 Linear 3 input weight bias output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "shape mismatch model");
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_writer_duplicate_tensor(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_writer_duplicate_tensor");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+
+    ModelPackage package;
+    package.input_name = "input";
+    package.input_shape = {1, 1};
+    package.output_name = "output";
+
+    package.tensors.push_back(NamedTensor{"weight", Tensor({1, 1}, {1.0f})});
+    package.tensors.push_back(NamedTensor{"weight", Tensor({1, 1}, {2.0f})});
+
+    package.nodes.push_back(NodeMetadata{"relu1", "ReLU", {"input"}, "output"});
+
+    bool caught = false;
+
+    try{
+        ModelWriter::save(package, manifest_path);
+    }catch(const std::exception&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error("ModelWriter accepted duplicate tensor names");
+    }
+
+    std::filesystem::remove_all(dir);
+}
+
+static void test_model_loader_missing_weights_file(){
+    const std::filesystem::path dir = reset_temp_dir("tinyinfer_bad_missing_weights");
+    const std::filesystem::path manifest_path = dir / "model.ti";
+
+    write_text_file(manifest_path,
+        "TINYINFER_MODEL 1\n"
+        "weights missing.bin\n"
+        "input input 2 1 1\n"
+        "output output\n"
+        "node relu1 ReLU 1 input output\n"
+        "end\n"
+    );
+
+    expect_model_load_failure(manifest_path, "missing weights file model");
+    std::filesystem::remove_all(dir);
+}
+
 int main(){
     test_transpose_2d();
     test_naive_matmul();
@@ -1089,6 +1337,15 @@ int main(){
     test_model_loader();
     test_model_writer_round_trip();
     test_model_writer_creates_files();
+    test_model_loader_unknown_operator();
+    test_model_loader_short_weights_file();
+    test_model_loader_tensor_byte_size_mismatch();
+    test_model_loader_missing_end();
+    test_model_loader_content_after_end();
+    test_model_loader_node_input_count_mismatch();
+    test_model_loader_shape_mismatch();
+    test_model_writer_duplicate_tensor();
+    test_model_loader_missing_weights_file();
 
     std::cout << "All tests passed.\n";
     return 0;

@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <system_error>
 
 namespace tinyinfer{
 
@@ -636,7 +637,12 @@ std::unique_ptr<LoadedModel> ModelLoader::load(const std::filesystem::path& mani
 
     const std::filesystem::path weights_path = manifest_path.parent_path() / model->metadata_.weights_file;
 
-    const uint64_t weights_size = std::filesystem::file_size(weights_path);
+    std::error_code ec;
+    const uint64_t weights_size = std::filesystem::file_size(weights_path, ec);
+
+    if(ec){
+        throw std::runtime_error("Cannot get weights file size: " + weights_path.string());
+    }
 
     std::ifstream weights(weights_path, std::ios::binary);
 
