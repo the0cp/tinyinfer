@@ -5,6 +5,8 @@ project(tinyinfer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Threads REQUIRED)
+
 add_library(tinyinfer
     src/ops.cpp
     src/tensor.cpp
@@ -17,6 +19,7 @@ add_library(tinyinfer
 )
 
 target_include_directories(tinyinfer PUBLIC include)
+target_link_libraries(tinyinfer PUBLIC Threads::Threads)
 
 if(MSVC)
     target_compile_options(tinyinfer PRIVATE /W4)

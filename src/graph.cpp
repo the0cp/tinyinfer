@@ -602,6 +602,54 @@ ExecutionPlan Graph::compile(
         }
     }
 
+    std::unordered_map<std::string, size_t> producer_by_tensor;
+    producer_by_tensor.reserve(plan.node_indices_.size());
+
+    for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
+        const Node& node = nodes_.at(plan.node_indices_[node_position]);
+        auto [it, inserted] = producer_by_tensor.emplace(node.output, node_position);
+        (void)it;
+
+        if(!inserted){
+            throw std::logic_error(
+                "ExecutionPlan scheduler analysis found duplicate producer for tensor '" + node.output + "'."
+            );
+        }
+    }
+
+    plan.schedule_infos_.assign(plan.node_indices_.size(), NodeScheduleInfo{});
+
+    std::vector<std::unordered_set<size_t>> dependency_sets(plan.node_indices_.size());
+
+    for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
+        const Node& node = nodes_.at(plan.node_indices_[node_position]);
+
+        for(const std::string& input : node.inputs){
+            auto producer_it = producer_by_tensor.find(input);
+
+            if(producer_it == producer_by_tensor.end()){
+                continue;
+            }
+
+            const size_t producer_position = producer_it->second;
+
+            if(producer_position >= node_position){
+                throw std::logic_error(
+                    "ExecutionPlan scheduler analysis found a non-topological dependency at node '" +
+                    node.name + "'."
+                );
+            }
+
+            if(dependency_sets[node_position].insert(producer_position).second){
+                plan.schedule_infos_.at(producer_position).consumers.push_back(node_position);
+            }
+        }
+    }
+
+    for(size_t node_position = 0; node_position < dependency_sets.size(); node_position++){
+        plan.schedule_infos_.at(node_position).dependency_count = dependency_sets[node_position].size();
+    }
+
     return plan;
 }
 
@@ -699,6 +747,56 @@ std::string Graph::dump_plan(const ExecutionPlan& plan) const{
 
         oss << ") -> " << node.output << " "
             << shape_to_string(plan.shape(node.output)) << "\n";
+    }
+
+    return oss.str();
+}
+
+
+std::string Graph::dump_scheduler_plan(const ExecutionPlan& plan) const{
+    if(plan.owner_ != this){
+        throw std::runtime_error(
+            "ExecutionPlan belongs to another Graph"
+        );
+    }
+
+    if(plan.graph_revision_ != revision_){
+        throw std::runtime_error(
+            "Cannot dump a stale ExecutionPlan"
+        );
+    }
+
+    std::ostringstream oss;
+    oss << "Scheduler plan:\n";
+
+    if(plan.schedule_infos_.empty()){
+        oss << "  <empty>\n";
+        return oss.str();
+    }
+
+    for(size_t node_position = 0; node_position < plan.schedule_infos_.size(); node_position++){
+        const Node& node = nodes_.at(plan.node_indices_.at(node_position));
+        const NodeScheduleInfo& info = plan.schedule_infos_.at(node_position);
+
+        oss << "  [" << node_position << "] " << node.name
+            << ": dependencies=" << info.dependency_count
+            << ", consumers=";
+
+        if(info.consumers.empty()){
+            oss << "<none>";
+        }else{
+            for(size_t i = 0; i < info.consumers.size(); i++){
+                if(i > 0){
+                    oss << ", ";
+                }
+
+                const size_t consumer_position = info.consumers[i];
+                const Node& consumer = nodes_.at(plan.node_indices_.at(consumer_position));
+                oss << "[" << consumer_position << "] " << consumer.name;
+            }
+        }
+
+        oss << "\n";
     }
 
     return oss.str();

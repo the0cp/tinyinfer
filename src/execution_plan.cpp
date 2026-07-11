@@ -37,6 +37,10 @@ const std::vector<TensorMemoryInfo>& ExecutionPlan::memory_infos() const noexcep
     return memory_infos_;
 }
 
+const std::vector<NodeScheduleInfo>& ExecutionPlan::schedule_infos() const noexcept{
+    return schedule_infos_;
+}
+
 size_t ExecutionPlan::node_count() const noexcept{
     return node_indices_.size();
 }

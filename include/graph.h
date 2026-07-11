@@ -21,6 +21,12 @@ struct Node{
 
 class Graph{
 public:
+    Graph() = default;
+    Graph(const Graph&) = delete;
+    Graph& operator=(const Graph&) = delete;
+    Graph(Graph&&) = delete;
+    Graph& operator=(Graph&&) = delete;
+
     void set_tensor(std::string name, Tensor tensor);
 
     void add_node(
@@ -57,6 +63,7 @@ public:
     std::string dump_constants() const;
     std::string dump_plan(const ExecutionPlan& plan) const;
     std::string dump_memory_plan(const ExecutionPlan& plan) const;
+    std::string dump_scheduler_plan(const ExecutionPlan& plan) const;
 
 private:
     OperatorRegistry registry_;

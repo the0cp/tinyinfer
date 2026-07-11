@@ -15,6 +15,11 @@ using ShapeTable = std::unordered_map<std::string, Shape>;
 
 inline constexpr size_t tensor_lifetime_npos = static_cast<size_t>(-1);
 
+struct NodeScheduleInfo{
+    size_t dependency_count = 0;
+    std::vector<size_t> consumers;
+};
+
 struct TensorMemoryInfo{
     std::string name;
     Shape shape;
@@ -43,6 +48,7 @@ public:
     const std::vector<std::string>& execution_order() const noexcept;
 
     const std::vector<TensorMemoryInfo>& memory_infos() const noexcept;
+    const std::vector<NodeScheduleInfo>& schedule_infos() const noexcept;
 
     size_t node_count() const noexcept;
 
@@ -60,6 +66,7 @@ private:
     std::vector<size_t> node_indices_;
     std::vector<std::string> execution_order_;
     std::vector<TensorMemoryInfo> memory_infos_;
+    std::vector<NodeScheduleInfo> schedule_infos_;
 };
 
 }

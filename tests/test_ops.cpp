@@ -8,14 +8,22 @@
 #include <iostream>
 #include <stdexcept>
 #include <atomic>
+#include <exception>
 #include <memory>
 #include <string>
+#include <thread>
+#include <type_traits>
 #include <utility>
 #include <filesystem>
 #include <fstream>
 #include <limits>
 
 using namespace tinyinfer;
+
+static_assert(!std::is_copy_constructible_v<Graph>);
+static_assert(!std::is_copy_assignable_v<Graph>);
+static_assert(!std::is_move_constructible_v<Graph>);
+static_assert(!std::is_move_assignable_v<Graph>);
 
 static void assert_close(float actual, float expected, float eps = 1e-4f){
     if(std::fabs(actual - expected) > eps){
@@ -43,6 +51,17 @@ static void assert_lifetime(
 ){
     if(info.produced_at != produced_at || info.first_use != first_use || info.last_use != last_use){
         throw std::runtime_error("lifetime mismatch for tensor: " + name);
+    }
+}
+
+
+static void assert_consumers(
+    const NodeScheduleInfo& info,
+    const std::vector<size_t>& expected,
+    const std::string& name
+){
+    if(info.consumers != expected){
+        throw std::runtime_error("consumer list mismatch for node: " + name);
     }
 }
 
@@ -536,6 +555,89 @@ static void test_execution_context_separate_workspaces(){
     assert_close(saved2.at({0, 1}), 0.0f);
 }
 
+static void test_execution_context_parallel_runs(){
+    Graph graph;
+
+    Tensor weight({3, 2}, {
+        1.0f, 2.0f,
+        3.0f, 4.0f,
+        5.0f, 6.0f
+    });
+
+    Tensor bias({2}, {1.0f, -1.0f});
+
+    graph.set_tensor("weight", std::move(weight));
+    graph.set_tensor("bias", std::move(bias));
+
+    graph.add_node(
+        "linear1",
+        OpType::Linear,
+        {"input", "weight", "bias"},
+        "hidden"
+    );
+
+    graph.add_node(
+        "relu1",
+        OpType::ReLU,
+        {"hidden"},
+        "output"
+    );
+
+    ExecutionPlan plan = graph.compile("input", {1, 3}, "output");
+
+    constexpr size_t thread_count = 8;
+    std::vector<std::thread> threads;
+    std::vector<std::exception_ptr> errors(thread_count);
+    std::vector<float> actual0(thread_count, 0.0f);
+    std::vector<float> actual1(thread_count, 0.0f);
+
+    threads.reserve(thread_count);
+
+    for(size_t i = 0; i < thread_count; i++){
+        threads.emplace_back([&, i]{
+            try{
+                const float base = static_cast<float>(i + 1);
+                Tensor input({1, 3}, {base, base + 1.0f, base + 2.0f});
+
+                ExecutionContext context;
+                Tensor output = graph.run(plan, context, input);
+
+                actual0[i] = output.at({0, 0});
+                actual1[i] = output.at({0, 1});
+
+                if(context.has_tensor("hidden")){
+                    throw std::runtime_error("parallel run kept a dead intermediate tensor");
+                }
+
+                if(!context.has_tensor("input") || !context.has_tensor("output")){
+                    throw std::runtime_error("parallel run lost input or output tensor");
+                }
+            }catch(...){
+                errors[i] = std::current_exception();
+            }
+        });
+    }
+
+    for(std::thread& thread : threads){
+        thread.join();
+    }
+
+    for(const std::exception_ptr& error : errors){
+        if(error){
+            std::rethrow_exception(error);
+        }
+    }
+
+    for(size_t i = 0; i < thread_count; i++){
+        const float base = static_cast<float>(i + 1);
+        const float expected0 = base + (base + 1.0f) * 3.0f + (base + 2.0f) * 5.0f + 1.0f;
+        const float expected1 = base * 2.0f + (base + 1.0f) * 4.0f + (base + 2.0f) * 6.0f - 1.0f;
+
+        assert_close(actual0[i], expected0);
+        assert_close(actual1[i], expected1);
+    }
+}
+
 static void test_execution_plan_shapes(){
     Graph graph;
 
@@ -651,6 +753,79 @@ static void test_execution_plan_lifetime_multi_use(){
     assert_lifetime(input, tensor_lifetime_npos, 0, 1, "input");
     assert_lifetime(hidden, 0, 1, 1, "hidden");
     assert_lifetime(output, 1, tensor_lifetime_npos, tensor_lifetime_npos, "output");
+}
+
+
+static void test_execution_plan_scheduler_infos(){
+    Graph graph;
+
+    graph.add_node(
+        "left_relu",
+        OpType::ReLU,
+        {"input"},
+        "left"
+    );
+
+    graph.add_node(
+        "right_relu",
+        OpType::ReLU,
+        {"input"},
+        "right"
+    );
+
+    graph.add_node(
+        "join_add",
+        OpType::Add,
+        {"left", "right"},
+        "joined"
+    );
+
+    graph.add_node(
+        "out_relu",
+        OpType::ReLU,
+        {"joined"},
+        "output"
+    );
+
+    ExecutionPlan plan = graph.compile("input", {2, 3}, "output");
+
+    const auto& schedule = plan.schedule_infos();
+
+    if(schedule.size() != 4){
+        throw std::runtime_error("scheduler info count mismatch");
+    }
+
+    if(schedule[0].dependency_count != 0 ||
+       schedule[1].dependency_count != 0 ||
+       schedule[2].dependency_count != 2 ||
+       schedule[3].dependency_count != 1){
+        throw std::runtime_error("scheduler dependency count mismatch");
+    }
+
+    assert_consumers(schedule[0], {2}, "left_relu");
+    assert_consumers(schedule[1], {2}, "right_relu");
+    assert_consumers(schedule[2], {3}, "join_add");
+    assert_consumers(schedule[3], {}, "out_relu");
+}
+
+static void test_graph_dump_scheduler_plan(){
+    Graph graph;
+
+    graph.add_node("left_relu", OpType::ReLU, {"input"}, "left");
+    graph.add_node("right_relu", OpType::ReLU, {"input"}, "right");
+    graph.add_node("join_add", OpType::Add, {"left", "right"}, "joined");
+    graph.add_node("out_relu", OpType::ReLU, {"joined"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {2, 3}, "output");
+    const std::string dump = graph.dump_scheduler_plan(plan);
+
+    if(dump.find("Scheduler plan:") == std::string::npos ||
+       dump.find("[0] left_relu: dependencies=0, consumers=[2] join_add") == std::string::npos ||
+       dump.find("[1] right_relu: dependencies=0, consumers=[2] join_add") == std::string::npos ||
+       dump.find("[2] join_add: dependencies=2, consumers=[3] out_relu") == std::string::npos ||
+       dump.find("[3] out_relu: dependencies=1, consumers=<none>") == std::string::npos){
+        throw std::runtime_error("SchedulerPlan dump is missing expected information");
+    }
 }
 
 static void test_execution_plan_invalidation(){
@@ -1707,8 +1882,11 @@ int main(){
     test_graph_compile_topological_order();
     test_execution_plan_reuse();
     test_execution_context_separate_workspaces();
+    test_execution_context_parallel_runs();
     test_execution_plan_shapes();
     test_execution_plan_memory_infos();
+    test_execution_plan_lifetime_multi_use();
+    test_execution_plan_scheduler_infos();
     test_execution_plan_invalidation();
     test_execution_plan_wrong_graph();
     test_execution_plan_input_shape_mismatch();
@@ -1723,6 +1901,7 @@ int main(){
     test_graph_constant_name_collision();
     test_graph_dump_plan();
     test_graph_dump_memory_plan();
+    test_graph_dump_scheduler_plan();
     test_operator_registry();
     test_thread_pool_tasks();
     test_thread_pool_exception();
