@@ -160,7 +160,6 @@ void Graph::set_tensor(std::string name, Tensor tensor){
 
     constants_.insert_or_assign(std::move(name), std::move(tensor));
 
-    workspace_.clear();
     revision_++;
 }
 
@@ -177,18 +176,23 @@ void Graph::add_node(
         std::move(output)
     });
 
-    workspace_.clear();
     revision_++;
 }
 
-void Graph::store_runtime_tensor(std::string name, Tensor tensor){
-    workspace_.insert_or_assign(std::move(name), std::move(tensor));
+void Graph::store_runtime_tensor(
+    ExecutionContext& context,
+    std::string name,
+    Tensor tensor
+) const{
+    context.set_tensor(std::move(name), std::move(tensor));
 }
 
-const Tensor& Graph::get_tensor_or_throw(const std::string& name) const{
-    auto rt_it = workspace_.find(name);
-    if(rt_it != workspace_.end()){
-        return rt_it->second;
+const Tensor& Graph::get_tensor_or_throw(
+    const ExecutionContext& context,
+    const std::string& name
+) const{
+    if(context.has_tensor(name)){
+        return context.tensor(name);
     }
 
     auto const_it = constants_.find(name);
@@ -199,19 +203,25 @@ const Tensor& Graph::get_tensor_or_throw(const std::string& name) const{
     throw std::runtime_error("Tensor not found: " + name);
 }
 
-const Tensor& Graph::tensor(const std::string& name) const{
-    return get_tensor_or_throw(name);
+const Tensor& Graph::constant(const std::string& name) const{
+    auto it = constants_.find(name);
+
+    if(it == constants_.end()){
+        throw std::runtime_error("Constant tensor not found: " + name);
+    }
+
+    return it->second;
 }
 
-bool Graph::has_tensor(const std::string& name) const{
-    return workspace_.contains(name) || constants_.contains(name);
+bool Graph::has_constant(const std::string& name) const{
+    return constants_.contains(name);
 }
 
 size_t Graph::num_nodes() const{
     return nodes_.size();
 }
 
-void Graph::execute_node(const Node& node){
+void Graph::execute_node(ExecutionContext& context, const Node& node) const{
     const OperatorDefinition& definition = registry_.get(node.op);
 
     if(node.inputs.size() != definition.input_count){
@@ -224,12 +234,12 @@ void Graph::execute_node(const Node& node){
     inputs.reserve(node.inputs.size());
 
     for(const std::string& input_name : node.inputs){
-        inputs.push_back(&get_tensor_or_throw(input_name));
+        inputs.push_back(&get_tensor_or_throw(context, input_name));
     }
 
     try{
         Tensor output = definition.execute(inputs);
-        store_runtime_tensor(node.output, std::move(output));
+        store_runtime_tensor(context, node.output, std::move(output));
     }catch(const std::exception& error){
         throw std::runtime_error(
             "Execution failed at node '" + node.name + "' (" + definition.name + "'): " + error.what()
@@ -239,28 +249,28 @@ void Graph::execute_node(const Node& node){
 
 Tensor Graph::run(
     const ExecutionPlan& plan,
+    ExecutionContext& context,
     const Tensor& input
-){
+) const{
     if(plan.owner_ != this){
         throw std::runtime_error("ExecutionPlan belongs to another Graph.");
     }
 
     if(plan.graph_revision_ != revision_){
-        throw std::runtime_error("ExectuionPlan is stale, the Graph changed after compilation");
+        throw std::runtime_error("ExecutionPlan is stale, the Graph changed after compilation");
     }
 
     const Shape& expected_shape = plan.shape(plan.input_name_);
 
     if(input.shape() != expected_shape){
         throw std::runtime_error(
-            "Input shape mismatch: expected " + shape_to_string(expected_shape) + 
+            "Input shape mismatch: expected " + shape_to_string(expected_shape) +
             ", got " + shape_to_string(input.shape())
         );
     }
 
-    workspace_.clear();
-
-    store_runtime_tensor(plan.input_name_, input);
+    context.clear();
+    store_runtime_tensor(context, plan.input_name_, input);
 
     for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
         const size_t node_index = plan.node_indices_[node_position];
@@ -271,18 +281,18 @@ Tensor Graph::run(
 
         const Node& node = nodes_[node_index];
 
-        execute_node(node);
+        execute_node(context, node);
 
         for(const std::string& input_name : node.inputs){
             const TensorMemoryInfo& info = find_memory_info_or_throw(plan, input_name);
 
             if(info.is_intermediate && info.last_use == node_position){
-                workspace_.erase(input_name);
+                context.erase_tensor(input_name);
             }
         }
     }
 
-    return tensor(plan.output_name_);
+    return context.tensor(plan.output_name_);
 }
 
 void Graph::validate_structure(
@@ -599,14 +609,15 @@ Tensor Graph::forward(
     const std::string& input_name,
     const Tensor& input,
     const std::string& output_name
-){
+) const{
     ExecutionPlan plan = compile(
         input_name,
         input.shape(),
         output_name
     );
 
-    return run(plan, input);
+    ExecutionContext context;
+    return run(plan, context, input);
 }
 
 std::string Graph::dump() const{
@@ -630,30 +641,19 @@ std::string Graph::dump() const{
     return oss.str();
 }
 
-std::string Graph::dump_tensors() const{
+std::string Graph::dump_constants() const{
     std::ostringstream oss;
     oss << "Constants:\n";
 
     if(constants_.empty()){
         oss << "  <empty>\n";
-    }else{
-        for(const auto& [name, tensor] : constants_){
-            oss << "  " << name
-                << ": shape=" << shape_to_string(tensor.shape())
-                << ", numel=" << tensor.numel() << "\n";
-        }
+        return oss.str();
     }
 
-    oss << "Workspace:\n";
-
-    if(workspace_.empty()){
-        oss << "  <empty>\n";
-    }else{
-        for(const auto& [name, tensor] : workspace_){
-            oss << "  " << name
-                << ": shape=" << shape_to_string(tensor.shape())
-                << ", numel=" << tensor.numel() << "\n";
-        }
+    for(const auto& [name, tensor] : constants_){
+        oss << "  " << name
+            << ": shape=" << shape_to_string(tensor.shape())
+            << ", numel=" << tensor.numel() << "\n";
     }
 
     return oss.str();

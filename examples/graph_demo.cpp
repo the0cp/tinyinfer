@@ -51,9 +51,11 @@ int main(){
     std::cout << graph.dump_plan(plan) << "\n";
     std::cout << graph.dump_memory_plan(plan) << "\n";
 
-    Tensor prob = graph.run(plan, x);
+    ExecutionContext context;
+    Tensor prob = graph.run(plan, context, x);
 
-    std::cout << graph.dump_tensors() << "\n";
+    std::cout << graph.dump_constants() << "\n";
+    std::cout << context.dump_tensors() << "\n";
 
     std::cout << "Output:\n";
     std::cout << prob.at({0, 0}) << " "

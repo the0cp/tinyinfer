@@ -37,9 +37,11 @@ int main(){
     std::cout << graph.dump_plan(plan) << "\n";
     std::cout << graph.dump_memory_plan(plan) << "\n";
 
-    Tensor y = graph.run(plan, x);
+    ExecutionContext context;
+    Tensor y = graph.run(plan, context, x);
 
-    std::cout << graph.dump_tensors() << "\n";
+    std::cout << graph.dump_constants() << "\n";
+    std::cout << context.dump_tensors() << "\n";
 
     std::cout << "Output:\n";
     std::cout << y.at({0, 0}) << " "

@@ -126,6 +126,11 @@ static void expect_model_write_failure(
     }
 }
 
+static Tensor run_graph(const Graph& graph, const ExecutionPlan& plan, const Tensor& input){
+    ExecutionContext context;
+    return graph.run(plan, context, input);
+}
+
 static Tensor registry_dummy_execute(const TensorInputs&){
     return Tensor({1}, {0.0f});
 }
@@ -382,17 +387,18 @@ static void test_graph_run_releases_unused_intermediates(){
     graph.add_node("relu2", OpType::ReLU, {"hidden"}, "output");
 
     ExecutionPlan plan = graph.compile("input", x.shape(), "output");
-    Tensor y = graph.run(plan, x);
+    ExecutionContext context;
+    Tensor y = graph.run(plan, context, x);
 
     assert_close(y.at({0, 0}), 0.0f);
     assert_close(y.at({0, 1}), 2.0f);
     assert_close(y.at({0, 2}), 3.0f);
 
-    if(graph.has_tensor("hidden")){
+    if(context.has_tensor("hidden")){
         throw std::runtime_error("unused intermediate tensor was not released");
     }
 
-    if(!graph.has_tensor("input") || !graph.has_tensor("output")){
+    if(!context.has_tensor("input") || !context.has_tensor("output")){
         throw std::runtime_error("runtime cleanup removed input or output tensor");
     }
 }
@@ -409,17 +415,18 @@ static void test_graph_run_keeps_intermediate_until_last_use(){
     graph.add_node("add1", OpType::Add, {"hidden", "hidden2"}, "output");
 
     ExecutionPlan plan = graph.compile("input", x.shape(), "output");
-    Tensor y = graph.run(plan, x);
+    ExecutionContext context;
+    Tensor y = graph.run(plan, context, x);
 
     assert_close(y.at({0, 0}), 0.0f);
     assert_close(y.at({0, 1}), 4.0f);
     assert_close(y.at({0, 2}), 6.0f);
 
-    if(graph.has_tensor("hidden") || graph.has_tensor("hidden2")){
+    if(context.has_tensor("hidden") || context.has_tensor("hidden2")){
         throw std::runtime_error("runtime cleanup kept a dead intermediate tensor");
     }
 
-    if(!graph.has_tensor("input") || !graph.has_tensor("output")){
+    if(!context.has_tensor("input") || !context.has_tensor("output")){
         throw std::runtime_error("runtime cleanup removed input or output tensor");
     }
 }
@@ -490,13 +497,43 @@ static void test_execution_plan_reuse(){
     Tensor x1({1, 3}, {1, 2, 3});
     Tensor x2({1, 3}, {4, 5, 6});
 
-    Tensor y1 = graph.run(plan, x1);
-    Tensor y2 = graph.run(plan, x2);
+    Tensor y1 = run_graph(graph, plan, x1);
+    Tensor y2 = run_graph(graph, plan, x2);
 
     assert_close(y1.at({0, 0}), 22);
     assert_close(y1.at({0, 1}), 28);
     assert_close(y2.at({0, 0}), 49);
     assert_close(y2.at({0, 1}), 64);
+}
+
+static void test_execution_context_separate_workspaces(){
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 2}, "output");
+
+    ExecutionContext context1;
+    ExecutionContext context2;
+
+    Tensor x1({1, 2}, {-1.0f, 2.0f});
+    Tensor x2({1, 2}, {3.0f, -4.0f});
+
+    Tensor y1 = graph.run(plan, context1, x1);
+    Tensor y2 = graph.run(plan, context2, x2);
+
+    assert_close(y1.at({0, 0}), 0.0f);
+    assert_close(y1.at({0, 1}), 2.0f);
+    assert_close(y2.at({0, 0}), 3.0f);
+    assert_close(y2.at({0, 1}), 0.0f);
+
+    const Tensor& saved1 = context1.tensor("output");
+    const Tensor& saved2 = context2.tensor("output");
+
+    assert_close(saved1.at({0, 0}), 0.0f);
+    assert_close(saved1.at({0, 1}), 2.0f);
+    assert_close(saved2.at({0, 0}), 3.0f);
+    assert_close(saved2.at({0, 1}), 0.0f);
 }
 
 static void test_execution_plan_shapes(){
@@ -640,7 +677,7 @@ static void test_execution_plan_invalidation(){
     bool caught = false;
 
     try{
-        graph.run(plan, Tensor({1, 1}, {1.0f}));
+        run_graph(graph, plan, Tensor({1, 1}, {1.0f}));
     }catch(const std::runtime_error&){
         caught = true;
     }
@@ -668,7 +705,7 @@ static void test_execution_plan_wrong_graph(){
     bool caught = false;
 
     try{
-        graph_b.run(plan, Tensor({1, 1}, {1.0f}));
+        run_graph(graph_b, plan, Tensor({1, 1}, {1.0f}));
     }catch(const std::runtime_error&){
         caught = true;
     }
@@ -699,7 +736,7 @@ static void test_execution_plan_input_shape_mismatch(){
     bool caught = false;
 
     try{
-        graph.run(plan, Tensor({1, 3}));
+        run_graph(graph, plan, Tensor({1, 3}));
     }catch(const std::runtime_error&){
         caught = true;
     }
@@ -765,7 +802,7 @@ static void test_graph_residual_add(){
         "output"
     );
 
-    Tensor y = graph.run(plan, x);
+    Tensor y = run_graph(graph, plan, x);
 
     assert_close(y.at({0, 0}), 2.0f);
     assert_close(y.at({0, 1}), 0.0f);
@@ -1669,6 +1706,7 @@ int main(){
     test_graph_run_keeps_intermediate_until_last_use();
     test_graph_compile_topological_order();
     test_execution_plan_reuse();
+    test_execution_context_separate_workspaces();
     test_execution_plan_shapes();
     test_execution_plan_memory_infos();
     test_execution_plan_invalidation();

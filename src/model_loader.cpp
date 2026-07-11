@@ -606,8 +606,9 @@ ModelMetadata ModelLoader::parse_manifest(const std::filesystem::path& manifest_
     return metadata;
 }
 
-Tensor LoadedModel::run(const Tensor& input){
-    return graph_.run(plan_, input);
+Tensor LoadedModel::run(const Tensor& input) const{
+    ExecutionContext context;
+    return graph_.run(plan_, context, input);
 }
 
 const Graph& LoadedModel::graph() const noexcept{

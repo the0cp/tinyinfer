@@ -63,7 +63,7 @@ public:
     LoadedModel(LoadedModel&&) = delete;
     LoadedModel& operator=(LoadedModel&&) = delete;
 
-    Tensor run(const Tensor& input);
+    Tensor run(const Tensor& input) const;
 
     const Graph& graph() const noexcept;
     const ExecutionPlan& plan() const noexcept;
