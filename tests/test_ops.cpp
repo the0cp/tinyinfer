@@ -24,6 +24,10 @@ static_assert(!std::is_copy_constructible_v<Graph>);
 static_assert(!std::is_copy_assignable_v<Graph>);
 static_assert(!std::is_move_constructible_v<Graph>);
 static_assert(!std::is_move_assignable_v<Graph>);
+static_assert(!std::is_copy_constructible_v<ExecutionContext>);
+static_assert(!std::is_copy_assignable_v<ExecutionContext>);
+static_assert(!std::is_move_constructible_v<ExecutionContext>);
+static_assert(!std::is_move_assignable_v<ExecutionContext>);
 
 static void assert_close(float actual, float expected, float eps = 1e-4f){
     if(std::fabs(actual - expected) > eps){
@@ -447,6 +451,71 @@ static void test_graph_run_keeps_intermediate_until_last_use(){
 
     if(!context.has_tensor("input") || !context.has_tensor("output")){
         throw std::runtime_error("runtime cleanup removed input or output tensor");
+    }
+}
+
+static void test_graph_run_ready_queue_branch_graph(){
+    Tensor x({1, 3}, {
+        -1.0f, 2.0f, 3.0f
+    });
+
+    Graph graph;
+
+    graph.add_node("left_relu", OpType::ReLU, {"input"}, "left");
+    graph.add_node("right_relu", OpType::ReLU, {"input"}, "right");
+    graph.add_node("join_add", OpType::Add, {"left", "right"}, "joined");
+    graph.add_node("out_relu", OpType::ReLU, {"joined"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
+    ExecutionContext context;
+    Tensor y = graph.run(plan, context, x);
+
+    assert_close(y.at({0, 0}), 0.0f);
+    assert_close(y.at({0, 1}), 4.0f);
+    assert_close(y.at({0, 2}), 6.0f);
+
+    if(context.has_tensor("left") ||
+       context.has_tensor("right") ||
+       context.has_tensor("joined")){
+        throw std::runtime_error("ready-queue executor kept a dead branch intermediate tensor");
+    }
+
+    if(!context.has_tensor("input") || !context.has_tensor("output")){
+        throw std::runtime_error("ready-queue executor removed input or output tensor");
+    }
+}
+
+
+static void test_graph_run_parallel_branch_graph(){
+    Tensor x({1, 3}, {
+        -1.0f, 2.0f, 3.0f
+    });
+
+    Graph graph;
+
+    graph.add_node("left_relu", OpType::ReLU, {"input"}, "left");
+    graph.add_node("right_relu", OpType::ReLU, {"input"}, "right");
+    graph.add_node("join_add", OpType::Add, {"left", "right"}, "joined");
+    graph.add_node("out_relu", OpType::ReLU, {"joined"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
+    ExecutionContext context;
+    ThreadPool pool(2);
+
+    Tensor y = graph.run_parallel(plan, context, x, pool);
+
+    assert_close(y.at({0, 0}), 0.0f);
+    assert_close(y.at({0, 1}), 4.0f);
+    assert_close(y.at({0, 2}), 6.0f);
+
+    if(context.has_tensor("left") ||
+       context.has_tensor("right") ||
+       context.has_tensor("joined")){
+        throw std::runtime_error("parallel executor kept a dead branch intermediate tensor");
+    }
+
+    if(!context.has_tensor("input") || !context.has_tensor("output")){
+        throw std::runtime_error("parallel executor removed input or output tensor");
     }
 }
 
@@ -1879,6 +1948,8 @@ int main(){
     test_graph_forward();
     test_graph_run_releases_unused_intermediates();
     test_graph_run_keeps_intermediate_until_last_use();
+    test_graph_run_ready_queue_branch_graph();
+    test_graph_run_parallel_branch_graph();
     test_graph_compile_topological_order();
     test_execution_plan_reuse();
     test_execution_context_separate_workspaces();

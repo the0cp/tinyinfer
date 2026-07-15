@@ -1,5 +1,6 @@
 #include "execution_context.h"
 
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 
@@ -28,14 +29,18 @@ std::string shape_to_string(const Shape& shape){
 }
 
 void ExecutionContext::clear(){
+    std::lock_guard<std::mutex> lock(mutex_);
     workspace_.clear();
 }
 
 bool ExecutionContext::has_tensor(const std::string& name) const{
+    std::lock_guard<std::mutex> lock(mutex_);
     return workspace_.contains(name);
 }
 
 const Tensor& ExecutionContext::tensor(const std::string& name) const{
+    std::lock_guard<std::mutex> lock(mutex_);
+
     auto it = workspace_.find(name);
 
     if(it == workspace_.end()){
@@ -46,6 +51,8 @@ const Tensor& ExecutionContext::tensor(const std::string& name) const{
 }
 
 std::string ExecutionContext::dump_tensors() const{
+    std::lock_guard<std::mutex> lock(mutex_);
+
     std::ostringstream oss;
     oss << "ExecutionContext tensors:\n";
 
@@ -64,10 +71,12 @@ std::string ExecutionContext::dump_tensors() const{
 }
 
 void ExecutionContext::set_tensor(std::string name, Tensor tensor){
+    std::lock_guard<std::mutex> lock(mutex_);
     workspace_.insert_or_assign(std::move(name), std::move(tensor));
 }
 
 void ExecutionContext::erase_tensor(const std::string& name){
+    std::lock_guard<std::mutex> lock(mutex_);
     workspace_.erase(name);
 }
 

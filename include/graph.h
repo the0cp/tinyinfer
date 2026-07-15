@@ -4,6 +4,7 @@
 #include "execution_plan.h"
 #include "operator_registry.h"
 #include "tensor.h"
+#include "thread_pool.h"
 
 #include <string>
 #include <unordered_map>
@@ -48,6 +49,13 @@ public:
         const Tensor& input
     ) const;
 
+    Tensor run_parallel(
+        const ExecutionPlan& plan,
+        ExecutionContext& context,
+        const Tensor& input,
+        ThreadPool& pool
+    ) const;
+
     Tensor forward(
         const std::string& input_name,
         const Tensor& input,
@@ -76,6 +84,11 @@ private:
     const Tensor& get_tensor_or_throw(
         const ExecutionContext& context,
         const std::string& name
+    ) const;
+
+    void validate_plan_for_run(
+        const ExecutionPlan& plan,
+        const Tensor& input
     ) const;
 
     void validate_structure(
