@@ -4,11 +4,13 @@
 #include "operator_registry.h"
 #include "model_loader.h"
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <atomic>
 #include <exception>
+#include <future>
 #include <memory>
 #include <string>
 #include <thread>
@@ -516,6 +518,179 @@ static void test_graph_run_parallel_branch_graph(){
 
     if(!context.has_tensor("input") || !context.has_tensor("output")){
         throw std::runtime_error("parallel executor removed input or output tensor");
+    }
+}
+
+static void test_graph_run_parallel_rejects_same_pool_worker(){
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 2}, "output");
+    Tensor x({1, 2}, {-1.0f, 2.0f});
+    ThreadPool pool(2);
+
+    pool.enqueue([&](){
+        ExecutionContext context;
+        (void)graph.run_parallel(plan, context, x, pool);
+    });
+
+    bool caught = false;
+
+    try{
+        pool.wait();
+    }catch(const std::logic_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(
+            "parallel executor did not reject being called from its own worker pool"
+        );
+    }
+}
+
+static void test_graph_run_parallel_stress(){
+    Graph graph;
+
+    graph.add_node("left_relu", OpType::ReLU, {"input"}, "left");
+    graph.add_node("right_relu", OpType::ReLU, {"input"}, "right");
+    graph.add_node("join_add", OpType::Add, {"left", "right"}, "joined");
+    graph.add_node("out_relu", OpType::ReLU, {"joined"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 4}, "output");
+    ThreadPool pool(4);
+
+    for(size_t i = 0; i < 64; i++){
+        const float base = static_cast<float>(i % 7) - 3.0f;
+        Tensor x({1, 4}, {base, base + 1.0f, base + 2.0f, base + 3.0f});
+
+        ExecutionContext context;
+        Tensor y = graph.run_parallel(plan, context, x, pool);
+
+        for(size_t j = 0; j < 4; j++){
+            const float relu_value = std::max(0.0f, x.at({0, j}));
+            assert_close(y.at({0, j}), relu_value * 2.0f);
+        }
+
+        if(context.has_tensor("left") ||
+           context.has_tensor("right") ||
+           context.has_tensor("joined")){
+            throw std::runtime_error("parallel stress run kept a dead intermediate tensor");
+        }
+
+        if(!context.has_tensor("input") || !context.has_tensor("output")){
+            throw std::runtime_error("parallel stress run removed input or output tensor");
+        }
+    }
+}
+
+
+static void test_graph_run_parallel_does_not_wait_for_unrelated_pool_tasks(){
+    Graph graph;
+
+    graph.add_node("left_relu", OpType::ReLU, {"input"}, "left");
+    graph.add_node("right_relu", OpType::ReLU, {"input"}, "right");
+    graph.add_node("join_add", OpType::Add, {"left", "right"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 3}, "output");
+    Tensor input({1, 3}, {-1.0f, 2.0f, 3.0f});
+    ThreadPool pool(3);
+
+    std::promise<void> blocker_started_promise;
+    std::future<void> blocker_started = blocker_started_promise.get_future();
+
+    std::promise<void> release_blocker_promise;
+    std::shared_future<void> release_blocker =
+        release_blocker_promise.get_future().share();
+
+    pool.enqueue([&](){
+        blocker_started_promise.set_value();
+        release_blocker.wait();
+    });
+
+    blocker_started.wait();
+
+    std::future<Tensor> graph_future = std::async(std::launch::async, [&](){
+        ExecutionContext context;
+        return graph.run_parallel(plan, context, input, pool);
+    });
+
+    const std::future_status status =
+        graph_future.wait_for(std::chrono::seconds(2));
+
+    if(status != std::future_status::ready){
+        release_blocker_promise.set_value();
+        graph_future.wait();
+        pool.wait();
+
+        throw std::runtime_error(
+            "parallel executor waited for unrelated ThreadPool work"
+        );
+    }
+
+    Tensor output = graph_future.get();
+
+    assert_close(output.at({0, 0}), 0.0f);
+    assert_close(output.at({0, 1}), 4.0f);
+    assert_close(output.at({0, 2}), 6.0f);
+
+    release_blocker_promise.set_value();
+    pool.wait();
+}
+
+static void test_graph_run_parallel_failure_cancels_descendants(){
+    Graph graph;
+
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "hidden");
+    graph.add_node("relu2", OpType::ReLU, {"hidden"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 2}, "output");
+
+    // White-box fault injection: the plan itself is non-const, so this
+    // deliberately corrupts scheduler metadata to exercise a worker failure.
+    auto& schedule =
+        const_cast<std::vector<NodeScheduleInfo>&>(plan.schedule_infos());
+    schedule[0].consumers.push_back(999);
+
+    Tensor input({1, 2}, {-1.0f, 2.0f});
+    ExecutionContext context;
+    ThreadPool pool(2);
+
+    bool caught = false;
+
+    try{
+        (void)graph.run_parallel(plan, context, input, pool);
+    }catch(const std::logic_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error(
+            "parallel executor did not propagate worker failure"
+        );
+    }
+
+    if(context.has_tensor("input") ||
+       context.has_tensor("hidden") ||
+       context.has_tensor("output")){
+        throw std::runtime_error(
+            "failed parallel run left partial tensors in ExecutionContext"
+        );
+    }
+
+    std::atomic<bool> pool_reused{false};
+
+    pool.enqueue([&](){
+        pool_reused.store(true);
+    });
+
+    pool.wait();
+
+    if(!pool_reused.load()){
+        throw std::runtime_error(
+            "ThreadPool was not reusable after parallel graph failure"
+        );
     }
 }
 
@@ -1950,6 +2125,10 @@ int main(){
     test_graph_run_keeps_intermediate_until_last_use();
     test_graph_run_ready_queue_branch_graph();
     test_graph_run_parallel_branch_graph();
+    test_graph_run_parallel_rejects_same_pool_worker();
+    test_graph_run_parallel_stress();
+    test_graph_run_parallel_does_not_wait_for_unrelated_pool_tasks();
+    test_graph_run_parallel_failure_cancels_descendants();
     test_graph_compile_topological_order();
     test_execution_plan_reuse();
     test_execution_context_separate_workspaces();

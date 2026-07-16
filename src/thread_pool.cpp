@@ -91,6 +91,10 @@ void ThreadPool::wait_until_idle(){
     });
 }
 
+bool ThreadPool::is_current_worker_thread() const noexcept{
+    return current_worker_pool_ == this;
+}
+
 size_t ThreadPool::size() const{
     return workers_.size();
 }

@@ -5,6 +5,17 @@ project(tinyinfer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(TINYINFER_ENABLE_TSAN "Build tinyinfer with ThreadSanitizer" OFF)
+
+if(TINYINFER_ENABLE_TSAN)
+    if(MSVC)
+        message(FATAL_ERROR "ThreadSanitizer is not supported by this CMake configuration on MSVC.")
+    endif()
+
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=thread)
+endif()
+
 find_package(Threads REQUIRED)
 
 add_library(tinyinfer

@@ -155,6 +155,20 @@ const TensorMemoryInfo& find_memory_info_or_throw(
     );
 }
 
+struct ParallelSchedulerState{
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    std::vector<size_t> remaining_dependencies;
+    std::unordered_map<std::string, size_t> remaining_intermediate_uses;
+
+    size_t completed_nodes = 0;
+    size_t in_flight_tasks = 0;
+
+    bool cancelled = false;
+    std::exception_ptr first_failure;
+};
+
 }
 
 void Graph::set_tensor(std::string name, Tensor tensor){
@@ -391,24 +405,28 @@ Tensor Graph::run_parallel(
 ) const{
     validate_plan_for_run(plan, input);
 
+    if(pool.is_current_worker_thread()){
+        throw std::logic_error(
+            "Cannot run the parallel graph executor from a worker of the same ThreadPool."
+        );
+    }
+
     context.clear();
     store_runtime_tensor(context, plan.input_name_, input);
 
-    std::vector<size_t> remaining_dependencies;
-    remaining_dependencies.reserve(plan.schedule_infos_.size());
+    ParallelSchedulerState state;
+    state.remaining_dependencies.reserve(plan.schedule_infos_.size());
 
     std::vector<size_t> initial_ready_nodes;
 
     for(size_t node_position = 0; node_position < plan.schedule_infos_.size(); node_position++){
         const size_t dependency_count = plan.schedule_infos_[node_position].dependency_count;
-        remaining_dependencies.push_back(dependency_count);
+        state.remaining_dependencies.push_back(dependency_count);
 
         if(dependency_count == 0){
             initial_ready_nodes.push_back(node_position);
         }
     }
-
-    std::unordered_map<std::string, size_t> remaining_intermediate_uses;
 
     for(size_t node_position = 0; node_position < plan.node_indices_.size(); node_position++){
         const Node& node = nodes_.at(plan.node_indices_[node_position]);
@@ -417,103 +435,169 @@ Tensor Graph::run_parallel(
             const TensorMemoryInfo& info = find_memory_info_or_throw(plan, input_name);
 
             if(info.is_intermediate){
-                remaining_intermediate_uses[input_name]++;
+                state.remaining_intermediate_uses[input_name]++;
             }
         }
     }
 
-    std::mutex scheduler_mutex;
-    std::condition_variable scheduler_cv;
-    size_t completed_nodes = 0;
-    std::exception_ptr first_failure;
+    if(!plan.node_indices_.empty() && initial_ready_nodes.empty()){
+        throw std::logic_error(
+            "Parallel executor found no initial ready nodes for a non-empty plan."
+        );
+    }
 
     std::function<void(size_t)> enqueue_node;
 
     enqueue_node = [&](size_t node_position){
-        pool.enqueue([&, node_position](){
-            std::vector<size_t> newly_ready_nodes;
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
 
-            try{
-                if(node_position >= plan.node_indices_.size()){
-                    throw std::logic_error("Parallel executor received an invalid node position.");
-                }
+            if(state.cancelled){
+                return;
+            }
 
-                const size_t node_index = plan.node_indices_[node_position];
+            state.in_flight_tasks++;
+        }
 
-                if(node_index >= nodes_.size()){
-                    throw std::logic_error("ExecutionPlan contains an invalid node.");
-                }
-
-                const Node& node = nodes_[node_index];
-                execute_node(context, node);
+        try{
+            pool.enqueue([&, node_position](){
+                std::vector<std::string> dead_tensors;
+                std::vector<size_t> newly_ready_nodes;
 
                 {
-                    std::lock_guard<std::mutex> lock(scheduler_mutex);
+                    std::lock_guard<std::mutex> lock(state.mutex);
 
-                    if(first_failure){
-                        scheduler_cv.notify_all();
+                    if(state.cancelled){
+                        state.in_flight_tasks--;
+                        state.cv.notify_all();
                         return;
                     }
+                }
 
-                    completed_nodes++;
+                try{
+                    if(node_position >= plan.node_indices_.size()){
+                        throw std::logic_error(
+                            "Parallel executor received an invalid node position."
+                        );
+                    }
 
-                    for(const std::string& input_name : node.inputs){
-                        const TensorMemoryInfo& info = find_memory_info_or_throw(plan, input_name);
+                    const size_t node_index = plan.node_indices_[node_position];
 
-                        if(!info.is_intermediate){
-                            continue;
+                    if(node_index >= nodes_.size()){
+                        throw std::logic_error(
+                            "ExecutionPlan contains an invalid node."
+                        );
+                    }
+
+                    const Node& node = nodes_[node_index];
+                    execute_node(context, node);
+
+                    {
+                        std::lock_guard<std::mutex> lock(state.mutex);
+
+                        if(!state.cancelled){
+                            state.completed_nodes++;
+
+                            for(const std::string& input_name : node.inputs){
+                                const TensorMemoryInfo& info = find_memory_info_or_throw(plan, input_name);
+
+                                if(!info.is_intermediate){
+                                    continue;
+                                }
+
+                                auto use_it = state.remaining_intermediate_uses.find(input_name);
+
+                                if(use_it == state.remaining_intermediate_uses.end() ||
+                                   use_it->second == 0){
+                                    throw std::logic_error(
+                                        "Parallel executor found inconsistent use count for tensor '" +
+                                        input_name + "'."
+                                    );
+                                }
+
+                                use_it->second--;
+
+                                if(use_it->second == 0){
+                                    dead_tensors.push_back(input_name);
+                                }
+                            }
+
+                            for(size_t consumer_position :
+                                plan.schedule_infos_[node_position].consumers){
+                                if(consumer_position >= state.remaining_dependencies.size()){
+                                    throw std::logic_error(
+                                        "Scheduler plan contains an invalid consumer position."
+                                    );
+                                }
+
+                                if(state.remaining_dependencies[consumer_position] == 0){
+                                    throw std::logic_error(
+                                        "Scheduler dependency count underflow."
+                                    );
+                                }
+
+                                state.remaining_dependencies[consumer_position]--;
+
+                                if(state.remaining_dependencies[consumer_position] == 0){
+                                    newly_ready_nodes.push_back(consumer_position);
+                                }
+                            }
                         }
+                    }
 
-                        auto use_it = remaining_intermediate_uses.find(input_name);
+                    for(const std::string& tensor_name : dead_tensors){
+                        context.erase_tensor(tensor_name);
+                    }
 
-                        if(use_it == remaining_intermediate_uses.end() || use_it->second == 0){
-                            throw std::logic_error(
-                                "Parallel executor found inconsistent use count for tensor '" +
-                                input_name + "'."
+                    for(size_t ready_node : newly_ready_nodes){
+                        enqueue_node(ready_node);
+                    }
+                }catch(...){
+                    std::lock_guard<std::mutex> lock(state.mutex);
+
+                    if(!state.first_failure){
+                        state.first_failure = std::current_exception();
+                    }
+
+                    state.cancelled = true;
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(state.mutex);
+
+                    if(state.in_flight_tasks == 0){
+                        if(!state.first_failure){
+                            state.first_failure = std::make_exception_ptr(
+                                std::logic_error(
+                                    "Parallel executor task accounting underflow."
+                                )
                             );
                         }
 
-                        use_it->second--;
-
-                        if(use_it->second == 0){
-                            context.erase_tensor(input_name);
-                        }
+                        state.cancelled = true;
+                    }else{
+                        state.in_flight_tasks--;
                     }
 
-                    for(size_t consumer_position : plan.schedule_infos_[node_position].consumers){
-                        if(consumer_position >= remaining_dependencies.size()){
-                            throw std::logic_error("Scheduler plan contains an invalid consumer position.");
-                        }
-
-                        if(remaining_dependencies[consumer_position] == 0){
-                            throw std::logic_error("Scheduler dependency count underflow.");
-                        }
-
-                        remaining_dependencies[consumer_position]--;
-
-                        if(remaining_dependencies[consumer_position] == 0){
-                            newly_ready_nodes.push_back(consumer_position);
-                        }
-                    }
+                    state.cv.notify_all();
                 }
+            });
+        }catch(...){
+            std::lock_guard<std::mutex> lock(state.mutex);
 
-                for(size_t ready_node : newly_ready_nodes){
-                    enqueue_node(ready_node);
-                }
-
-                scheduler_cv.notify_all();
-            }catch(...){
-                {
-                    std::lock_guard<std::mutex> lock(scheduler_mutex);
-
-                    if(!first_failure){
-                        first_failure = std::current_exception();
-                    }
-                }
-
-                scheduler_cv.notify_all();
+            if(state.in_flight_tasks == 0){
+                throw;
             }
-        });
+
+            state.in_flight_tasks--;
+
+            if(!state.first_failure){
+                state.first_failure = std::current_exception();
+            }
+
+            state.cancelled = true;
+            state.cv.notify_all();
+        }
     };
 
     for(size_t node_position : initial_ready_nodes){
@@ -521,24 +605,33 @@ Tensor Graph::run_parallel(
     }
 
     std::exception_ptr failure;
+    size_t completed_nodes = 0;
 
     {
-        std::unique_lock<std::mutex> lock(scheduler_mutex);
-        scheduler_cv.wait(lock, [&](){
-            return completed_nodes == plan.node_indices_.size() || first_failure;
+        std::unique_lock<std::mutex> lock(state.mutex);
+
+        state.cv.wait(lock, [&](){
+            const bool completed = state.completed_nodes == plan.node_indices_.size() && state.in_flight_tasks == 0;
+
+            const bool failed_and_drained = state.first_failure && state.in_flight_tasks == 0;
+
+            return completed || failed_and_drained;
         });
 
-        failure = first_failure;
+        failure = state.first_failure;
+        completed_nodes = state.completed_nodes;
     }
 
-    pool.wait();
-
     if(failure){
+        context.clear();
         std::rethrow_exception(failure);
     }
 
     if(completed_nodes != plan.node_indices_.size()){
-        throw std::logic_error("Parallel executor did not complete all nodes.");
+        context.clear();
+        throw std::logic_error(
+            "Parallel executor did not complete all nodes."
+        );
     }
 
     return context.tensor(plan.output_name_);

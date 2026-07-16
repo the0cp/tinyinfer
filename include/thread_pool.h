@@ -22,6 +22,7 @@ public:
     void enqueue(std::function<void()> task);
     void wait();
 
+    bool is_current_worker_thread() const noexcept;
     size_t size() const;
 private:
     std::vector<std::thread> workers_;
