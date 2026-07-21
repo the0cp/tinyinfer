@@ -59,6 +59,12 @@ add_executable(bench_matmul
 
 target_link_libraries(bench_matmul PRIVATE tinyinfer)
 
+add_executable(bench_graph_scheduler
+    benchmark/bench_graph_scheduler.cpp
+)
+
+target_link_libraries(bench_graph_scheduler PRIVATE tinyinfer)
+
 add_executable(model_demo
     examples/model.cpp
 )
