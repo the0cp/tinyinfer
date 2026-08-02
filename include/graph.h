@@ -18,7 +18,11 @@ struct Node{
     OpType op;
     std::vector<std::string> inputs;
     std::string output;
+
+    bool operator==(const Node&) const = default;
 };
+
+class PassManager;
 
 class Graph{
 public:
@@ -74,6 +78,8 @@ public:
     std::string dump_scheduler_plan(const ExecutionPlan& plan) const;
 
 private:
+    friend class PassManager;
+
     OperatorRegistry registry_;
 
     std::unordered_map<std::string, Tensor> constants_;

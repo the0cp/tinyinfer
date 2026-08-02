@@ -23,6 +23,7 @@ add_library(tinyinfer
     src/tensor.cpp
     src/thread_pool.cpp
     src/graph.cpp
+    src/graph_optimizer.cpp
     src/operator_registry.cpp
     src/execution_plan.cpp
     src/execution_context.cpp

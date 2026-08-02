@@ -1,6 +1,7 @@
 #include "ops.h"
 #include "module.h"
 #include "graph.h"
+#include "graph_optimizer.h"
 #include "operator_registry.h"
 #include "model_loader.h"
 
@@ -150,6 +151,69 @@ static void expect_model_write_failure(
         throw std::runtime_error(test_name + " did not fail");
     }
 }
+
+
+class NoOpGraphPass final : public GraphPass{
+public:
+    std::string_view name() const noexcept override{
+        return "no-op";
+    }
+
+    void run(
+        GraphRewriteContext&,
+        const GraphOptimizationContext&
+    ) const override{}
+};
+
+class RenameNodeGraphPass final : public GraphPass{
+public:
+    RenameNodeGraphPass(std::string from, std::string to)
+        : from_(std::move(from)), to_(std::move(to)){}
+
+    std::string_view name() const noexcept override{
+        return "rename-node";
+    }
+
+    void run(
+        GraphRewriteContext& graph,
+        const GraphOptimizationContext&
+    ) const override{
+        std::vector<Node> nodes = graph.nodes();
+
+        for(Node& node : nodes){
+            if(node.name == from_){
+                node.name = to_;
+                graph.replace_nodes(std::move(nodes));
+                return;
+            }
+        }
+    }
+
+private:
+    std::string from_;
+    std::string to_;
+};
+
+class InvalidDependencyGraphPass final : public GraphPass{
+public:
+    std::string_view name() const noexcept override{
+        return "invalid-dependency";
+    }
+
+    void run(
+        GraphRewriteContext& graph,
+        const GraphOptimizationContext&
+    ) const override{
+        std::vector<Node> nodes = graph.nodes();
+
+        if(nodes.empty()){
+            return;
+        }
+
+        nodes.front().inputs = {"missing_tensor"};
+        graph.replace_nodes(std::move(nodes));
+    }
+};
 
 static Tensor run_graph(const Graph& graph, const ExecutionPlan& plan, const Tensor& input){
     ExecutionContext context;
@@ -2111,8 +2175,139 @@ static void test_model_loader_missing_weights_file(){
     std::filesystem::remove_all(dir);
 }
 
+
+static void test_pass_manager_noop_preserves_plan(){
+    Graph graph;
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    ExecutionPlan plan = graph.compile("input", {1, 2}, "output");
+
+    PassManager manager;
+    manager.emplace_pass<NoOpGraphPass>();
+
+    const GraphOptimizationReport report = manager.run(
+        graph,
+        GraphOptimizationContext{"input", {1, 2}, "output"}
+    );
+
+    if(report.changed() || report.passes().size() != 1 || report.passes()[0].changed){
+        throw std::runtime_error("no-op pass reported a graph change");
+    }
+
+    Tensor input({1, 2}, {-1.0f, 2.0f});
+    Tensor output = run_graph(graph, plan, input);
+
+    assert_close(output.at({0, 0}), 0.0f);
+    assert_close(output.at({0, 1}), 2.0f);
+}
+
+static void test_pass_manager_commits_and_invalidates_plan(){
+    Graph graph;
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    ExecutionPlan old_plan = graph.compile("input", {1, 2}, "output");
+
+    PassManager manager;
+    manager.emplace_pass<RenameNodeGraphPass>("relu1", "relu_optimized");
+
+    const GraphOptimizationReport report = manager.run(
+        graph,
+        GraphOptimizationContext{"input", {1, 2}, "output"}
+    );
+
+    if(!report.changed() || report.passes().size() != 1 || !report.passes()[0].changed){
+        throw std::runtime_error("rename pass did not report a graph change");
+    }
+
+    if(graph.dump().find("relu_optimized") == std::string::npos){
+        throw std::runtime_error("optimized graph did not commit the rewritten node");
+    }
+
+    bool stale_caught = false;
+    Tensor input({1, 2}, {-1.0f, 2.0f});
+
+    try{
+        (void)run_graph(graph, old_plan, input);
+    }catch(const std::runtime_error&){
+        stale_caught = true;
+    }
+
+    if(!stale_caught){
+        throw std::runtime_error("optimization did not invalidate the old execution plan");
+    }
+
+    ExecutionPlan new_plan = graph.compile("input", {1, 2}, "output");
+    Tensor output = run_graph(graph, new_plan, input);
+
+    assert_close(output.at({0, 0}), 0.0f);
+    assert_close(output.at({0, 1}), 2.0f);
+}
+
+static void test_pass_manager_rolls_back_invalid_pipeline(){
+    Graph graph;
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    ExecutionPlan original_plan = graph.compile("input", {1, 2}, "output");
+    const std::string original_dump = graph.dump();
+
+    PassManager manager;
+    manager.emplace_pass<RenameNodeGraphPass>("relu1", "renamed_before_failure");
+    manager.emplace_pass<InvalidDependencyGraphPass>();
+
+    bool caught = false;
+
+    try{
+        (void)manager.run(
+            graph,
+            GraphOptimizationContext{"input", {1, 2}, "output"}
+        );
+    }catch(const std::runtime_error&){
+        caught = true;
+    }
+
+    if(!caught){
+        throw std::runtime_error("invalid optimization pipeline did not fail verification");
+    }
+
+    if(graph.dump() != original_dump){
+        throw std::runtime_error("failed optimization pipeline changed the graph");
+    }
+
+    Tensor input({1, 2}, {-1.0f, 2.0f});
+    Tensor output = run_graph(graph, original_plan, input);
+
+    assert_close(output.at({0, 0}), 0.0f);
+    assert_close(output.at({0, 1}), 2.0f);
+}
+
+static void test_graph_optimization_report_dump(){
+    Graph graph;
+    graph.add_node("relu1", OpType::ReLU, {"input"}, "output");
+
+    PassManager manager;
+    manager.emplace_pass<NoOpGraphPass>();
+    manager.emplace_pass<RenameNodeGraphPass>("relu1", "relu_optimized");
+
+    const GraphOptimizationReport report = manager.run(
+        graph,
+        GraphOptimizationContext{"input", {1, 2}, "output"}
+    );
+
+    const std::string dump = report.dump();
+
+    if(dump.find("Optimization report:") == std::string::npos ||
+       dump.find("no-op: changed=no, nodes=1 -> 1") == std::string::npos ||
+       dump.find("rename-node: changed=yes, nodes=1 -> 1") == std::string::npos){
+        throw std::runtime_error("optimization report dump is missing expected information");
+    }
+}
+
 int main(){
     test_tensor_shape_overflow();
+    test_pass_manager_noop_preserves_plan();
+    test_pass_manager_commits_and_invalidates_plan();
+    test_pass_manager_rolls_back_invalid_pipeline();
+    test_graph_optimization_report_dump();
     test_transpose_2d();
     test_naive_matmul();
     test_matmul_transposed_b();
