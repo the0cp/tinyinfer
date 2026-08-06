@@ -33,7 +33,6 @@ public:
 
 private:
     friend class PassManager;
-
     std::vector<GraphPassReport> passes_;
 };
 
@@ -61,13 +60,22 @@ private:
 class GraphPass{
 public:
     virtual ~GraphPass() = default;
-
     virtual std::string_view name() const noexcept = 0;
 
     virtual void run(
         GraphRewriteContext& graph,
         const GraphOptimizationContext& context
     ) const = 0;
+};
+
+class DeadNodeEliminationPass final : public GraphPass{
+public:
+    std::string_view name() const noexcept override;
+
+    void run(
+        GraphRewriteContext& graph,
+        const GraphOptimizationContext& context
+    ) const override;
 };
 
 class PassManager{
@@ -86,7 +94,8 @@ public:
 
     GraphOptimizationReport run(
         Graph& graph,
-        const GraphOptimizationContext& context
+        const GraphOptimizationContext& context,
+        const OperatorRegistry& registry
     ) const;
 
 private:

@@ -1,47 +1,32 @@
-#include "module.h"
+#include "model_loader.h"
 
+#include <filesystem>
 #include <iostream>
 
-using namespace tinyinfer;
+int main(){
+    using namespace tinyinfer;
 
-int main() {
-    Tensor x({2, 3}, {
-        1, 2, 3,
-        4, 5, 6
+    const std::filesystem::path directory =
+        std::filesystem::temp_directory_path() / "tinyinfer_model_demo";
+    std::filesystem::remove_all(directory);
+
+    ModelPackage package;
+    package.input_name = "input";
+    package.input_shape = {1, 2};
+    package.output_name = "output";
+    package.tensors.push_back(NamedTensor{
+        "weight", Tensor({2, 1}, {2.0f, 3.0f})
+    });
+    package.tensors.push_back(NamedTensor{"bias", Tensor({1}, {1.0f})});
+    package.nodes.push_back(NodeMetadata{
+        "linear", "Linear", {"input", "weight", "bias"}, "output"
     });
 
-    Tensor w1({3, 4}, {
-        0.1f, 0.2f, 0.3f, 0.4f,
-        0.5f, 0.6f, 0.7f, 0.8f,
-        0.9f, 1.0f, 1.1f, 1.2f
-    });
-
-    Tensor b1({4}, {
-        0.1f, 0.1f, 0.1f, 0.1f
-    });
-
-    Tensor w2({4, 2}, {
-        0.1f, 0.2f,
-        0.3f, 0.4f,
-        0.5f, 0.6f,
-        0.7f, 0.8f
-    });
-
-    Tensor b2({2}, {
-        0.5f, 0.5f
-    });
-
-    Sequential model;
-
-    model.add(std::make_unique<Linear>(std::move(w1), std::move(b1)));
-    model.add(std::make_unique<ReLU>());
-    model.add(std::make_unique<Linear>(std::move(w2), std::move(b2)));
-    model.add(std::make_unique<Softmax>());
-
-    Tensor y = model.forward(x);
-
-    std::cout << y.at({0, 0}) << " " << y.at({0, 1}) << "\n";
-    std::cout << y.at({1, 0}) << " " << y.at({1, 1}) << "\n";
-
+    const std::filesystem::path manifest = directory / "model.ti";
+    ModelWriter::save(package, manifest);
+    std::unique_ptr<InferenceSession> session = ModelLoader::load(manifest);
+    Tensor output = session->run(Tensor({1, 2}, {4.0f, 5.0f}));
+    std::cout << "loaded model output = " << output.data()[0] << "\n";
+    std::filesystem::remove_all(directory);
     return 0;
 }

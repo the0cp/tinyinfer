@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 namespace tinyinfer{
 
@@ -64,8 +65,8 @@ size_t Tensor::compute_offset(std::initializer_list<size_t> indices) const{
     }
 
     size_t offset = 0;
-    
     size_t i = 0;
+
     for(size_t index : indices){
         if(index >= shape_[i]){
             throw std::runtime_error("Tensor index out of range.");
@@ -74,7 +75,7 @@ size_t Tensor::compute_offset(std::initializer_list<size_t> indices) const{
         offset += index * strides_[i];
         i++;
     }
-    
+
     return offset;
 }
 

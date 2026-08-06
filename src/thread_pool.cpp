@@ -15,9 +15,7 @@ ThreadPool::ThreadPool(size_t num_threads){
     workers_.reserve(num_threads);
 
     for(size_t i = 0; i < num_threads; i++){
-        workers_.emplace_back([this](){
-            worker_loop();
-        });
+        workers_.emplace_back([this](){ worker_loop(); });
     }
 }
 
@@ -60,21 +58,15 @@ void ThreadPool::enqueue(std::function<void()> task){
 }
 
 void ThreadPool::wait(){
-     if(current_worker_pool_ == this){
-        throw std::logic_error(
-            "A worker cannot wait on its own ThreadPool."
-        );
+    if(current_worker_pool_ == this){
+        throw std::logic_error("A worker cannot wait on its own ThreadPool.");
     }
 
     std::exception_ptr failure;
 
     {
         std::unique_lock<std::mutex> lock(mutex_);
-
-        done_cv_.wait(lock, [this](){
-            return tasks_.empty() && active_tasks_ == 0;
-        });
-
+        done_cv_.wait(lock, [this](){ return tasks_.empty() && active_tasks_ == 0; });
         failure = std::exchange(first_failure_, nullptr);
     }
 
@@ -85,10 +77,7 @@ void ThreadPool::wait(){
 
 void ThreadPool::wait_until_idle(){
     std::unique_lock<std::mutex> lock(mutex_);
-
-    done_cv_.wait(lock, [this](){
-        return tasks_.empty() && active_tasks_ == 0;
-    });
+    done_cv_.wait(lock, [this](){ return tasks_.empty() && active_tasks_ == 0; });
 }
 
 bool ThreadPool::is_current_worker_thread() const noexcept{
@@ -101,16 +90,13 @@ size_t ThreadPool::size() const{
 
 void ThreadPool::worker_loop(){
     current_worker_pool_ = this;
-    
+
     while(true){
         std::function<void()> task;
 
         {
             std::unique_lock<std::mutex> lock(mutex_);
-
-            task_cv_.wait(lock, [this](){
-                return stop_ || !tasks_.empty();
-            });
+            task_cv_.wait(lock, [this](){ return stop_ || !tasks_.empty(); });
 
             if(stop_ && tasks_.empty()){
                 return;

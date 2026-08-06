@@ -16,8 +16,7 @@ int main(){
     session.initialize();
 
     Tensor output = session.run(Tensor({1, 2}, {1.0f, 2.0f}));
-    std::cout << session.graph().dump(OperatorRegistry{});
+    std::cout << "output = [" << output.data()[0] << ", " << output.data()[1] << "]\n\n";
     std::cout << session.plan().dump();
-    std::cout << "output = [" << output.data()[0] << ", " << output.data()[1] << "]\n";
     return 0;
 }

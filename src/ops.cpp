@@ -1,9 +1,8 @@
 #include "ops.h"
 
 #include <algorithm>
-#include <stdexcept>
 #include <cmath>
-#include <limits>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -30,15 +29,11 @@ Tensor transpose_2d(const Tensor& x){
 
     const size_t rows = x.shape()[0];
     const size_t cols = x.shape()[1];
-
     Tensor out({cols, rows});
-
-    const float* x_data = x.data();
-    float* out_data = out.data();
 
     for(size_t i = 0; i < rows; i++){
         for(size_t j = 0; j < cols; j++){
-            out_data[j * rows + i] = x_data[i * cols + j];
+            out.data()[j * rows + i] = x.data()[i * cols + j];
         }
     }
 
@@ -68,7 +63,6 @@ Tensor naive_matmul(const Tensor& a, const Tensor& b){
     }
 
     const size_t n = b.shape()[1];
-
     Tensor out({m, n});
 
     for(size_t i = 0; i < m; i++){
@@ -88,18 +82,17 @@ Tensor naive_matmul(const Tensor& a, const Tensor& b){
 
 Tensor fast_matmul(const Tensor& a, const Tensor& b){
     if(a.dim() != 2 || b.dim() != 2){
-        throw std::runtime_error("naive_matmul only supports 2D tensors.");
+        throw std::runtime_error("fast_matmul only supports 2D tensors.");
     }
 
-    size_t m = a.shape()[0];
-    size_t k = a.shape()[1];
+    const size_t m = a.shape()[0];
+    const size_t k = a.shape()[1];
 
     if(b.shape()[0] != k){
-        throw std::runtime_error("naive_matmul shape mismatch.");
+        throw std::runtime_error("fast_matmul shape mismatch.");
     }
 
-    size_t n = b.shape()[1];
-
+    const size_t n = b.shape()[1];
     Tensor out({m, n});
 
     const float* a_data = a.data();
@@ -109,11 +102,13 @@ Tensor fast_matmul(const Tensor& a, const Tensor& b){
     for(size_t i = 0; i < m; i++){
         const float* a_row = a_data + i * k;
         float* out_row = out_data + i * n;
+
         for(size_t p = 0; p < k; p++){
-            const float a_val = a_row[p];
+            const float a_value = a_row[p];
             const float* b_row = b_data + p * n;
+
             for(size_t j = 0; j < n; j++){
-                out_row[j] += a_val * b_row[j];
+                out_row[j] += a_value * b_row[j];
             }
         }
     }
@@ -125,7 +120,7 @@ Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
     if(block_size == 0){
         throw std::runtime_error("blocked_matmul requires a non-zero block size.");
     }
-    
+
     if(a.dim() != 2 || b.dim() != 2){
         throw std::runtime_error("matmul only supports 2D tensors.");
     }
@@ -138,12 +133,7 @@ Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
     }
 
     const size_t n = b.shape()[1];
-
     Tensor out({m, n});
-
-    const float* a_data = a.data();
-    const float* b_data = b.data();
-    float* out_data = out.data();
 
     for(size_t ii = 0; ii < m; ii += block_size){
         for(size_t pp = 0; pp < k; pp += block_size){
@@ -153,15 +143,15 @@ Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
                 const size_t j_end = std::min(jj + block_size, n);
 
                 for(size_t i = ii; i < i_end; i++){
-                    const float* a_row = a_data + i * k;
-                    float* out_row = out_data + i * n;
+                    const float* a_row = a.data() + i * k;
+                    float* out_row = out.data() + i * n;
 
                     for(size_t p = pp; p < p_end; p++){
-                        const float a_val = a_row[p];
-                        const float* b_row = b_data + p * n;
+                        const float a_value = a_row[p];
+                        const float* b_row = b.data() + p * n;
 
                         for(size_t j = jj; j < j_end; j++){
-                            out_row[j] += a_val * b_row[j];
+                            out_row[j] += a_value * b_row[j];
                         }
                     }
                 }
@@ -179,7 +169,6 @@ Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt){
 
     const size_t m = a.shape()[0];
     const size_t k = a.shape()[1];
-
     const size_t n = bt.shape()[0];
 
     if(bt.shape()[1] != k){
@@ -188,20 +177,18 @@ Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt){
 
     Tensor out({m, n});
 
-    const float* a_data = a.data();
-    const float* bt_data = bt.data();
-    float* out_data = out.data();
-
     for(size_t i = 0; i < m; i++){
-        const float* a_row = a_data + i * k;
+        const float* a_row = a.data() + i * k;
+
         for(size_t j = 0; j < n; j++){
-            const float* bt_row = bt_data + j * k;
+            const float* bt_row = bt.data() + j * k;
             float sum = 0.0f;
+
             for(size_t p = 0; p < k; p++){
                 sum += a_row[p] * bt_row[p];
             }
 
-            out_data[i * n + j] = sum;
+            out.data()[i * n + j] = sum;
         }
     }
 
@@ -226,31 +213,21 @@ Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
         return Tensor({m, n});
     }
 
-    if(num_threads == 0){
-        num_threads = 1;
-    }
-
-    if(num_threads > m){
-        num_threads = m;
-    }
-
+    num_threads = std::max<size_t>(1, std::min(num_threads, m));
     Tensor out({m, n});
-
-    const float* a_data = a.data();
-    const float* b_data = b.data();
-    float* out_data = out.data();
+    const size_t rows_per_thread = (m + num_threads - 1) / num_threads;
 
     auto worker = [&](size_t row_begin, size_t row_end){
         for(size_t i = row_begin; i < row_end; i++){
-            const float* a_row = a_data + i * k;
-            float* out_row = out_data + i * n;
+            const float* a_row = a.data() + i * k;
+            float* out_row = out.data() + i * n;
 
             for(size_t p = 0; p < k; p++){
-                const float a_val = a_row[p];
-                const float* b_row = b_data + p * n;
+                const float a_value = a_row[p];
+                const float* b_row = b.data() + p * n;
 
                 for(size_t j = 0; j < n; j++){
-                    out_row[j] += a_val * b_row[j];
+                    out_row[j] += a_value * b_row[j];
                 }
             }
         }
@@ -259,21 +236,17 @@ Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
 
-    const size_t rows_per_thread = (m + num_threads - 1) / num_threads;
-
     for(size_t t = 0; t < num_threads; t++){
         const size_t row_begin = t * rows_per_thread;
         const size_t row_end = std::min(row_begin + rows_per_thread, m);
 
-        if(row_begin >= row_end){
-            break;
+        if(row_begin < row_end){
+            threads.emplace_back(worker, row_begin, row_end);
         }
-
-        threads.emplace_back(worker, row_begin, row_end);
     }
 
-    for(auto& t : threads){
-        t.join();
+    for(auto& thread : threads){
+        thread.join();
     }
 
     return out;
@@ -301,16 +274,8 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
         num_tasks = pool.size();
     }
 
-    if(num_tasks > m){
-        num_tasks = m;
-    }
-
+    num_tasks = std::min(num_tasks, m);
     Tensor out({m, n});
-
-    const float* a_data = a.data();
-    const float* b_data = b.data();
-    float* out_data = out.data();
-
     const size_t rows_per_task = (m + num_tasks - 1) / num_tasks;
 
     for(size_t task_id = 0; task_id < num_tasks; task_id++){
@@ -321,17 +286,17 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
             break;
         }
 
-        pool.enqueue([=](){
+        pool.enqueue([&, row_begin, row_end, k, n](){
             for(size_t i = row_begin; i < row_end; i++){
-                const float* a_row = a_data + i * k;
-                float* out_row = out_data + i * n;
+                const float* a_row = a.data() + i * k;
+                float* out_row = out.data() + i * n;
 
                 for(size_t p = 0; p < k; p++){
-                    const float a_val = a_row[p];
-                    const float* b_row = b_data + p * n;
+                    const float a_value = a_row[p];
+                    const float* b_row = b.data() + p * n;
 
                     for(size_t j = 0; j < n; j++){
-                        out_row[j] += a_val * b_row[j];
+                        out_row[j] += a_value * b_row[j];
                     }
                 }
             }
@@ -339,7 +304,6 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
     }
 
     pool.wait();
-
     return out;
 }
 
@@ -361,13 +325,9 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
 
     Tensor out(x.shape());
 
-    const float* x_data = x.data();
-    const float* bias_data = bias.data();
-    float* out_data = out.data();
-
     for(size_t i = 0; i < batch; i++){
         for(size_t j = 0; j < features; j++){
-            out_data[i * features + j] = x_data[i * features + j] + bias_data[j];
+            out.data()[i * features + j] = x.data()[i * features + j] + bias.data()[j];
         }
     }
 
@@ -375,8 +335,7 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
 }
 
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
-    Tensor y = fast_matmul(x, weight);
-    return add_bias(y, bias);
+    return add_bias(fast_matmul(x, weight), bias);
 }
 
 Tensor softmax(const Tensor& x){
@@ -387,30 +346,25 @@ Tensor softmax(const Tensor& x){
     const size_t batch = x.shape()[0];
     const size_t features = x.shape()[1];
 
-    Tensor out(x.shape());
-
     if(features == 0){
         throw std::runtime_error("softmax requires a non-empty feature dimension.");
     }
 
-    const float* x_data = x.data();
-    float* out_data = out.data();
+    Tensor out(x.shape());
 
     for(size_t i = 0; i < batch; i++){
-        const float* x_row = x_data + i * features;
-        float* out_row = out_data + i * features;
-
-        float max_val = x_row[0];
-        float sum = 0.0f;
+        const float* x_row = x.data() + i * features;
+        float* out_row = out.data() + i * features;
+        float max_value = x_row[0];
 
         for(size_t j = 1; j < features; j++){
-            if(x_row[j] > max_val){
-                max_val = x_row[j];
-            }
+            max_value = std::max(max_value, x_row[j]);
         }
 
+        float sum = 0.0f;
+
         for(size_t j = 0; j < features; j++){
-            out_row[j] = std::exp(x_row[j] - max_val);
+            out_row[j] = std::exp(x_row[j] - max_value);
             sum += out_row[j];
         }
 

@@ -2,12 +2,12 @@
 
 #include <condition_variable>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
-#include <exception>
 
 namespace tinyinfer{
 
@@ -24,6 +24,7 @@ public:
 
     bool is_current_worker_thread() const noexcept;
     size_t size() const;
+
 private:
     std::vector<std::thread> workers_;
     std::queue<std::function<void()>> tasks_;
@@ -39,7 +40,6 @@ private:
     static thread_local const ThreadPool* current_worker_pool_;
 
     void wait_until_idle();
-
     void worker_loop();
 };
 

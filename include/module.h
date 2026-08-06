@@ -4,27 +4,27 @@
 #include "tensor.h"
 
 #include <memory>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
 namespace tinyinfer{
 
+// Legacy eager teaching API. It is intentionally not part of the compiled runtime path.
 class Module{
 public:
     virtual ~Module() = default;
-    
     virtual Tensor forward(const Tensor& input) = 0;
 };
 
 class Linear : public Module{
 public:
     Linear(Tensor weight, Tensor bias)
-        : weight_(std::move(weight)), bias_(std::move(bias)) {}
+        : weight_(std::move(weight)), bias_(std::move(bias)){}
 
     Tensor forward(const Tensor& input) override{
         return linear(input, weight_, bias_);
     }
+
 private:
     Tensor weight_;
     Tensor bias_;
@@ -51,16 +51,16 @@ public:
     }
 
     Tensor forward(const Tensor& input){
-        Tensor x = input;
+        Tensor value = input;
 
         for(auto& module : modules_){
-            x = module->forward(x);
+            value = module->forward(value);
         }
 
-        return x;
+        return value;
     }
 
-    size_t size() const{
+    size_t size() const noexcept{
         return modules_.size();
     }
 

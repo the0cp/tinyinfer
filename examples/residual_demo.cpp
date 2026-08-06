@@ -1,56 +1,27 @@
-#include "graph.h"
+#include "inference_session.h"
 
 #include <iostream>
-#include <utility>
-
-using namespace tinyinfer;
 
 int main(){
-    Tensor x({2, 3}, {
-        1, -2, 3,
-        4, -5, 6
-    });
-
-    Tensor w({3, 3}, {
-        1, 0, 0,
-        0, 1, 0,
-        0, 0, 1
-    });
-
-    Tensor b({3}, {
-        0, 0, 0
-    });
+    using namespace tinyinfer;
 
     Graph graph;
+    graph.add_node("left", OpType::ReLU, {"input"}, "left_out");
+    graph.add_node("right", OpType::ReLU, {"input"}, "right_out");
+    graph.add_node("residual_add", OpType::Add, {"left_out", "right_out"}, "output");
 
-    graph.set_tensor("w", std::move(w));
-    graph.set_tensor("b", std::move(b));
+    SessionOptions options;
+    options.execution_mode = ExecutionMode::Parallel;
+    options.inter_op_threads = 2;
 
-    graph.add_node("relu1", OpType::ReLU, {"sum"}, "output");
-    graph.add_node("add1", OpType::Add, {"input", "h"}, "sum");
-    graph.add_node("linear1", OpType::Linear, {"input", "w", "b"}, "h");
+    InferenceSession session(options);
+    session.load(std::move(graph), "input", {1, 3}, "output");
+    session.initialize();
 
-    std::cout << graph.dump() << "\n";
-
-    ExecutionPlan plan = graph.compile("input", x.shape(), "output");
-
-    std::cout << graph.dump_plan(plan) << "\n";
-    std::cout << graph.dump_memory_plan(plan) << "\n";
-
-    ExecutionContext context;
-    Tensor y = graph.run(plan, context, x);
-
-    std::cout << graph.dump_constants() << "\n";
-    std::cout << context.dump_tensors() << "\n";
-
-    std::cout << "Output:\n";
-    std::cout << y.at({0, 0}) << " "
-              << y.at({0, 1}) << " "
-              << y.at({0, 2}) << "\n";
-
-    std::cout << y.at({1, 0}) << " "
-              << y.at({1, 1}) << " "
-              << y.at({1, 2}) << "\n";
-
+    Tensor output = session.run(Tensor({1, 3}, {-1.0f, 2.0f, 3.0f}));
+    std::cout << "residual output = ["
+              << output.data()[0] << ", "
+              << output.data()[1] << ", "
+              << output.data()[2] << "]\n";
     return 0;
 }

@@ -1,17 +1,16 @@
 #pragma once
 
-#include "execution_context.h"
-#include "execution_plan.h"
 #include "operator_registry.h"
 #include "tensor.h"
-#include "thread_pool.h"
+#include "value_index.h"
 
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace tinyinfer{
+
+using ShapeTable = std::unordered_map<std::string, Shape>;
 
 struct Node{
     std::string name;
@@ -23,100 +22,69 @@ struct Node{
 };
 
 class PassManager;
+class SessionState;
 
 class Graph{
 public:
     Graph() = default;
-    Graph(const Graph&) = delete;
-    Graph& operator=(const Graph&) = delete;
-    Graph(Graph&&) = delete;
-    Graph& operator=(Graph&&) = delete;
+    Graph(const Graph&) = default;
+    Graph& operator=(const Graph&) = default;
+    Graph(Graph&&) noexcept = default;
+    Graph& operator=(Graph&&) noexcept = default;
 
     void set_tensor(std::string name, Tensor tensor);
 
     void add_node(
         std::string name,
         OpType op,
-        std::vector<std::string> input,
+        std::vector<std::string> inputs,
         std::string output
     );
 
-    ExecutionPlan compile(
-        const std::string& input_name,
-        const Shape& input_shape,
-        const std::string& output_name
-    ) const;
+    void resolve(
+        std::string input_name,
+        Shape input_shape,
+        std::string output_name,
+        const OperatorRegistry& registry
+    );
 
-    Tensor run(
-        const ExecutionPlan& plan,
-        ExecutionContext& context,
-        const Tensor& input
-    ) const;
+    bool is_resolved() const noexcept;
 
-    Tensor run_parallel(
-        const ExecutionPlan& plan,
-        ExecutionContext& context,
-        const Tensor& input,
-        ThreadPool& pool
-    ) const;
-
-    Tensor forward(
-        const std::string& input_name,
-        const Tensor& input,
-        const std::string& output_name
-    ) const;
+    const std::string& input_name() const;
+    const Shape& input_shape() const;
+    const std::string& output_name() const;
 
     const Tensor& constant(const std::string& name) const;
+    bool has_constant(const std::string& name) const noexcept;
 
-    size_t num_nodes() const;
-    bool has_constant(const std::string& name) const;
+    const std::unordered_map<std::string, Tensor>& constants() const noexcept;
+    const std::vector<Node>& nodes() const noexcept;
+    const std::vector<NodeIndex>& topological_order() const;
+    const ShapeTable& shapes() const;
+    const Shape& shape(const std::string& value_name) const;
 
-    std::string dump() const;
+    size_t num_nodes() const noexcept;
+
+    std::string dump(const OperatorRegistry& registry) const;
     std::string dump_constants() const;
-    std::string dump_plan(const ExecutionPlan& plan) const;
-    std::string dump_memory_plan(const ExecutionPlan& plan) const;
-    std::string dump_scheduler_plan(const ExecutionPlan& plan) const;
 
 private:
     friend class PassManager;
+    friend class SessionState;
 
-    OperatorRegistry registry_;
+    void replace_nodes(std::vector<Node> nodes);
+    void invalidate_resolve_state() noexcept;
+    void require_resolved() const;
 
     std::unordered_map<std::string, Tensor> constants_;
     std::vector<Node> nodes_;
 
-    size_t revision_ = 0;
-
-    const Tensor& get_tensor_or_throw(
-        const ExecutionContext& context,
-        const std::string& name
-    ) const;
-
-    void validate_plan_for_run(
-        const ExecutionPlan& plan,
-        const Tensor& input
-    ) const;
-
-    void validate_structure(
-        const std::string& input_name,
-        const std::string& output_name
-    ) const;
-
-    void store_runtime_tensor(
-        ExecutionContext& context,
-        std::string name,
-        Tensor tensor
-    ) const;
-
-    Shape infer_node_output_shape(
-        const Node& node,
-        const ShapeTable& shapes
-    ) const;
-
-    void execute_node(
-        ExecutionContext& context,
-        const Node& node
-    ) const;
+    bool resolved_ = false;
+    std::string input_name_;
+    Shape input_shape_;
+    std::string output_name_;
+    ShapeTable shapes_;
+    std::vector<NodeIndex> topological_order_;
 };
 
 }
