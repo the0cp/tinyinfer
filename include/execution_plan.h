@@ -18,8 +18,9 @@ enum class ValueRole{
 };
 
 inline constexpr size_t lifetime_npos = static_cast<size_t>(-1);
+// Represents an undefined lifetime position for values in the execution plan
 
-struct ValueInfo{
+struct ValueInfo{  // Represents metadata about a value in the execution plan
     std::string name;
     Shape shape;
     ValueRole role = ValueRole::Intermediate;
@@ -32,7 +33,7 @@ struct ValueInfo{
     size_t consumer_count = 0;
 };
 
-struct NodeExecutionPlan{
+struct NodeExecutionPlan{  // Represents the execution plan for a single node in the graph
     NodeIndex source_node_index = invalid_node_index;
     std::string name;
     OpType op = OpType::ReLU;
@@ -66,7 +67,8 @@ public:
     std::string dump_scheduler_plan() const;
 
 private:
-    friend class SessionState;
+    friend class SessionState;  
+    // Allow SessionState to construct and modify the ExecutionPlan
 
     ValueNameIndexMap value_names_;
     std::vector<ValueInfo> values_;

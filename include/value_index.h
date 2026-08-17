@@ -15,7 +15,7 @@ using NodeIndex = uint32_t;
 inline constexpr ValueIndex invalid_value_index = std::numeric_limits<ValueIndex>::max();
 inline constexpr NodeIndex invalid_node_index = std::numeric_limits<NodeIndex>::max();
 
-class ValueNameIndexMap{
+class ValueNameIndexMap{  // Maps value names to their corresponding indices in the execution plan
 public:
     ValueIndex add(std::string name);
 

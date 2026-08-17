@@ -57,7 +57,7 @@ private:
     bool changed_ = false;
 };
 
-class GraphPass{
+class GraphPass{  // Represents a single optimization pass, use virtual to implement different passes
 public:
     virtual ~GraphPass() = default;
     virtual std::string_view name() const noexcept = 0;
@@ -88,7 +88,7 @@ public:
         Pass& reference = *pass;
         add_pass(std::move(pass));
         return reference;
-    }
+    }  // Add a new optimization pass to the manager, constructing it in place with the provided arguments
 
     size_t size() const noexcept;
 

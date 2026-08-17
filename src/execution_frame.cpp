@@ -35,7 +35,7 @@ ExecutionFrame::ExecutionFrame(const SessionState& session_state)
 void ExecutionFrame::bind_input(ValueIndex index, const Tensor& tensor){
     const ExecutionPlan& plan = session_state_.execution_plan();
 
-    if(index != plan.input_index()){
+    if(index != plan.input_index()){  // Check if the index corresponds to the graph input
         throw std::invalid_argument("ExecutionFrame can only bind the compiled graph input.");
     }
 

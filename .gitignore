@@ -1,4 +1,6 @@
 build/
 .vscode/
+.cache/
 *.zip
+/README.md
 docs/

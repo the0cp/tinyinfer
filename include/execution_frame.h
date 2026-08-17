@@ -17,7 +17,8 @@ public:
     ExecutionFrame(ExecutionFrame&&) = delete;
     ExecutionFrame& operator=(ExecutionFrame&&) = delete;
 
-    void bind_input(ValueIndex index, const Tensor& tensor);
+    void bind_input(ValueIndex index, const Tensor& tensor);  
+    // Bind an input tensor to the execution frame.
 
     bool has_value(ValueIndex index) const;
     const Tensor& value(ValueIndex index) const;
@@ -29,8 +30,8 @@ public:
 
 private:
     struct ValueSlot{
-        const Tensor* borrowed = nullptr;
-        std::optional<Tensor> owned;
+        const Tensor* borrowed = nullptr;   // Pointer to a tensor that is borrowed from outside the frame
+        std::optional<Tensor> owned;  // Optional tensor that is owned by the execution frame
 
         bool has_value() const noexcept{
             return borrowed != nullptr || owned.has_value();
