@@ -1,6 +1,7 @@
 #include "executor.h"
 
 #include "op_kernel.h"
+#include "profiler.h"
 
 #include <condition_variable>
 #include <exception>
@@ -24,13 +25,24 @@ struct ParallelRunState{
     std::exception_ptr first_failure;
 };
 
+std::string exception_message(const std::exception_ptr& failure){
+    try{
+        std::rethrow_exception(failure);
+    }catch(const std::exception& error){
+        return error.what();
+    }catch(...){
+        return "non-standard exception";
+    }
+}
+
 }
 
 ParallelExecutor::ParallelExecutor(ThreadPool& pool) : pool_(pool){}
 
 void ParallelExecutor::execute(
     const SessionState& session_state,
-    ExecutionFrame& frame
+    ExecutionFrame& frame,
+    RunProfiler* profiler
 ) const{
     if(pool_.is_current_worker_thread()){
         throw std::logic_error(
@@ -81,6 +93,10 @@ void ParallelExecutor::execute(
         }
 
         try{
+            if(profiler){
+                profiler->node_queued(position);
+            }
+
             pool_.enqueue([&, position](){
                 std::vector<ValueIndex> dead_values;
                 std::vector<size_t> ready_consumers;
@@ -94,6 +110,11 @@ void ParallelExecutor::execute(
                 if(should_run){
                     try{
                         const NodeExecutionPlan& node = plan.nodes().at(position);
+
+                        if(profiler){
+                            profiler->node_started(position);
+                        }
+
                         OpKernelContext context(node, frame);
                         session_state.kernel(node.kernel_index).compute(context);
 
@@ -147,14 +168,41 @@ void ParallelExecutor::execute(
                             frame.release(value);
                         }
 
+                        if(profiler){
+                            profiler->node_completed(position);
+                        }
+
                         for(size_t consumer : ready_consumers){
                             schedule(consumer);
                         }
                     }catch(...){
+                        const std::exception_ptr failure = std::current_exception();
+
+                        if(profiler){
+                            try{
+                                profiler->node_failed(position, exception_message(failure));
+                            }catch(...){
+                                // Preserve the original execution failure.
+                            }
+                        }
+
                         std::lock_guard<std::mutex> lock(state.mutex);
 
                         if(!state.first_failure){
-                            state.first_failure = std::current_exception();
+                            state.first_failure = failure;
+                        }
+
+                        state.cancelled = true;
+                    }
+                }else if(profiler){
+                    try{
+                        profiler->node_cancelled(position);
+                    }catch(...){
+                        const std::exception_ptr failure = std::current_exception();
+                        std::lock_guard<std::mutex> lock(state.mutex);
+
+                        if(!state.first_failure){
+                            state.first_failure = failure;
                         }
 
                         state.cancelled = true;
@@ -179,6 +227,16 @@ void ParallelExecutor::execute(
                 }
             });
         }catch(...){
+            const std::exception_ptr failure = std::current_exception();
+
+            if(profiler){
+                try{
+                    profiler->node_failed(position, exception_message(failure));
+                }catch(...){
+                    // Preserve the original enqueue failure.
+                }
+            }
+
             std::lock_guard<std::mutex> lock(state.mutex);
 
             if(state.in_flight_tasks > 0){
@@ -186,7 +244,7 @@ void ParallelExecutor::execute(
             }
 
             if(!state.first_failure){
-                state.first_failure = std::current_exception();
+                state.first_failure = failure;
             }
 
             state.cancelled = true;

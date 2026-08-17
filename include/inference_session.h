@@ -4,6 +4,7 @@
 #include "kernel_registry.h"
 #include "model_format.h"
 #include "operator_registry.h"
+#include "profiler.h"
 #include "session_options.h"
 #include "session_state.h"
 #include "thread_pool.h"
@@ -40,6 +41,7 @@ public:
     void initialize();
 
     Tensor run(const Tensor& input) const;
+    Tensor run(const Tensor& input, RunProfile& profile) const;
 
     SessionLifecycle lifecycle() const noexcept;
     PassManager& pass_manager();
@@ -51,6 +53,7 @@ public:
 
 private:
     void require_initialized() const;
+    Tensor run_impl(const Tensor& input, RunProfile* profile) const;
 
     SessionOptions options_;
     SessionLifecycle lifecycle_ = SessionLifecycle::Created;

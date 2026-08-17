@@ -41,6 +41,7 @@ add_library(tinyinfer
     src/graph_optimizer.cpp
     src/execution_plan.cpp
     src/session_state.cpp
+    src/profiler.cpp
     src/execution_frame.cpp
     src/op_kernel.cpp
     src/kernel_registry.cpp
@@ -95,3 +96,6 @@ target_link_libraries(bench_graph_scheduler PRIVATE tinyinfer)
 
 add_executable(bench_session benchmark/bench_session.cpp)
 target_link_libraries(bench_session PRIVATE tinyinfer)
+
+add_executable(bench_profiler benchmark/bench_profiler.cpp)
+target_link_libraries(bench_profiler PRIVATE tinyinfer)

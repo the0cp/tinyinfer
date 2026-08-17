@@ -2,6 +2,7 @@
 
 #include "execution_frame.h"
 #include "executor.h"
+#include "profiler.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -9,6 +10,20 @@
 #include <utility>
 
 namespace tinyinfer{
+
+namespace{
+
+std::string current_exception_message(){
+    try{
+        throw;
+    }catch(const std::exception& error){
+        return error.what();
+    }catch(...){
+        return "non-standard exception";
+    }
+}
+
+}
 
 InferenceSession::InferenceSession(SessionOptions options)
     : options_(options){
@@ -83,26 +98,69 @@ void InferenceSession::initialize(){
 }
 
 Tensor InferenceSession::run(const Tensor& input) const{
-    require_initialized();
+    return run_impl(input, nullptr);
+}
 
-    const SessionState& state = *session_state_;
-    const ExecutionPlan& execution_plan = state.execution_plan();
-    ExecutionFrame frame(state);
-    frame.bind_input(execution_plan.input_index(), input);
+Tensor InferenceSession::run(const Tensor& input, RunProfile& profile) const{
+    return run_impl(input, &profile);
+}
 
-    if(options_.execution_mode == ExecutionMode::Sequential){
-        SequentialExecutor executor;
-        executor.execute(state, frame);
-    }else{
-        if(!inter_op_thread_pool_){
-            throw std::logic_error("Parallel InferenceSession has no inter-op ThreadPool.");
-        }
+Tensor InferenceSession::run_impl(const Tensor& input, RunProfile* profile) const{
+    std::unique_ptr<RunProfiler> profiler;
 
-        ParallelExecutor executor(*inter_op_thread_pool_);
-        executor.execute(state, frame);
+    if(profile){
+        *profile = RunProfile{};
     }
 
-    return frame.fetch(execution_plan.output_index());
+    try{
+        require_initialized();
+
+        const SessionState& state = *session_state_;
+        const ExecutionPlan& execution_plan = state.execution_plan();
+
+        if(profile){
+            profiler = std::make_unique<RunProfiler>(execution_plan);
+        }
+
+        ExecutionFrame frame(state, profiler.get());
+        frame.bind_input(execution_plan.input_index(), input);
+
+        if(options_.execution_mode == ExecutionMode::Sequential){
+            SequentialExecutor executor;
+            executor.execute(state, frame, profiler.get());
+        }else{
+            if(!inter_op_thread_pool_){
+                throw std::logic_error("Parallel InferenceSession has no inter-op ThreadPool.");
+            }
+
+            ParallelExecutor executor(*inter_op_thread_pool_);
+            executor.execute(state, frame, profiler.get());
+        }
+
+        Tensor output = frame.fetch(execution_plan.output_index());
+
+        if(profiler){
+            profiler->finish(true);
+            *profile = profiler->snapshot();
+        }
+
+        return output;
+    }catch(...){
+        if(profiler){
+            const std::string message = current_exception_message();
+
+            try{
+                profiler->finish(false, message);
+                *profile = profiler->snapshot();
+            }catch(...){
+                // Profiling must never replace the original runtime failure.
+            }
+        }else if(profile){
+            profile->error = current_exception_message();
+        }
+
+        throw;
+    }
 }
 
 SessionLifecycle InferenceSession::lifecycle() const noexcept{

@@ -8,9 +8,11 @@
 
 namespace tinyinfer{
 
+class RunProfiler;
+
 class ExecutionFrame{
 public:
-    explicit ExecutionFrame(const SessionState& session_state);
+    explicit ExecutionFrame(const SessionState& session_state, RunProfiler* profiler = nullptr);
 
     ExecutionFrame(const ExecutionFrame&) = delete;
     ExecutionFrame& operator=(const ExecutionFrame&) = delete;
@@ -39,6 +41,7 @@ private:
     };
 
     const SessionState& session_state_;
+    RunProfiler* profiler_ = nullptr;
     std::vector<ValueSlot> values_;
 };
 

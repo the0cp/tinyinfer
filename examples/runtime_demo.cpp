@@ -15,8 +15,10 @@ int main(){
     session.load(std::move(graph), "input", {1, 2}, "output");
     session.initialize();
 
-    Tensor output = session.run(Tensor({1, 2}, {1.0f, 2.0f}));
+    RunProfile profile;
+    Tensor output = session.run(Tensor({1, 2}, {1.0f, 2.0f}), profile);
     std::cout << "output = [" << output.data()[0] << ", " << output.data()[1] << "]\n\n";
     std::cout << session.plan().dump();
+    std::cout << "\n" << profile.summary();
     return 0;
 }

@@ -1,5 +1,7 @@
 #include "execution_frame.h"
 
+#include "profiler.h"
+
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -25,8 +27,8 @@ std::string shape_to_string(const Shape& shape){
 
 }
 
-ExecutionFrame::ExecutionFrame(const SessionState& session_state)
-    : session_state_(session_state), values_(session_state.value_count()){
+ExecutionFrame::ExecutionFrame(const SessionState& session_state, RunProfiler* profiler)
+    : session_state_(session_state), profiler_(profiler), values_(session_state.value_count()){
     for(ValueIndex index = 0; static_cast<size_t>(index) < values_.size(); index++){
         values_[index].borrowed = session_state_.initializer(index);
     }
@@ -98,6 +100,10 @@ void ExecutionFrame::set_value(ValueIndex index, Tensor tensor){
     }
 
     slot.owned = std::move(tensor);
+
+    if(profiler_){
+        profiler_->value_allocated(index, session_state_.execution_plan().value_info(index).byte_size);
+    }
 }
 
 void ExecutionFrame::release(ValueIndex index){
@@ -108,6 +114,11 @@ void ExecutionFrame::release(ValueIndex index){
     }
 
     ValueSlot& slot = values_.at(index);
+
+    if(slot.owned && profiler_){
+        profiler_->value_released(index, info.byte_size);
+    }
+
     slot.owned.reset();
     slot.borrowed = nullptr;
 }
