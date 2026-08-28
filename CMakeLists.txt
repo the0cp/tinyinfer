@@ -32,6 +32,7 @@ endif()
 find_package(Threads REQUIRED)
 
 add_library(tinyinfer
+    src/buffer.cpp
     src/tensor.cpp
     src/ops.cpp
     src/thread_pool.cpp
@@ -66,9 +67,13 @@ target_link_libraries(test_ops PRIVATE tinyinfer)
 add_executable(test_runtime tests/test_runtime.cpp)
 target_link_libraries(test_runtime PRIVATE tinyinfer)
 
+add_executable(test_tensor_storage tests/test_tensor_storage.cpp)
+target_link_libraries(test_tensor_storage PRIVATE tinyinfer)
+
 enable_testing()
 add_test(NAME test_ops COMMAND test_ops)
 add_test(NAME test_runtime COMMAND test_runtime)
+add_test(NAME test_tensor_storage COMMAND test_tensor_storage)
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)
@@ -99,3 +104,6 @@ target_link_libraries(bench_session PRIVATE tinyinfer)
 
 add_executable(bench_profiler benchmark/bench_profiler.cpp)
 target_link_libraries(bench_profiler PRIVATE tinyinfer)
+
+add_executable(bench_tensor_storage benchmark/bench_tensor_storage.cpp)
+target_link_libraries(bench_tensor_storage PRIVATE tinyinfer)

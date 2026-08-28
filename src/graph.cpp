@@ -399,6 +399,7 @@ std::string Graph::dump_constants() const{
     for(const std::string& name : names){
         const Tensor& tensor = constants_.at(name);
         oss << "  " << name << ": shape=" << shape_to_string(tensor.shape())
+            << ", dtype=" << data_type_name(tensor.dtype())
             << ", numel=" << tensor.numel() << "\n";
     }
 

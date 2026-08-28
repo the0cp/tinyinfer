@@ -6,6 +6,7 @@
 #include <charconv>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
@@ -100,6 +101,12 @@ uint64_t checked_numel(
     const std::filesystem::path& path,
     size_t line_number
 ){
+    for(size_t dimension : shape){
+        if(dimension == 0){
+            return 0;
+        }
+    }
+
     uint64_t total = 1;
 
     for(size_t dimension : shape){
@@ -113,13 +120,37 @@ uint64_t checked_numel(
 }
 
 uint64_t tensor_byte_size(const Tensor& tensor){
-    const uint64_t numel = static_cast<uint64_t>(tensor.numel());
-
-    if(numel > std::numeric_limits<uint64_t>::max() / sizeof(float)){
-        throw std::runtime_error("Tensor byte size overflows uint64.");
+    if(tensor.dtype() != DataType::Float32){
+        throw std::runtime_error("TinyInfer model format v1 only supports float32 tensors.");
     }
 
-    return numel * sizeof(float);
+    const size_t bytes = tensor.size_bytes();
+
+    if constexpr(sizeof(size_t) > sizeof(uint64_t)){
+        if(bytes > std::numeric_limits<uint64_t>::max()){
+            throw std::runtime_error("Tensor byte size overflows uint64.");
+        }
+    }
+
+    return static_cast<uint64_t>(bytes);
+}
+
+void require_float32(const TensorMetadata& metadata){
+    if(metadata.dtype != DataType::Float32){
+        throw std::runtime_error(
+            "TinyInfer model format v1 only supports float32 tensor '" + metadata.name + "'."
+        );
+    }
+}
+
+std::streamsize checked_streamsize(uint64_t bytes, const std::string& tensor_name){
+    if(bytes > static_cast<uint64_t>(std::numeric_limits<std::streamsize>::max())){
+        throw std::runtime_error(
+            "Tensor '" + tensor_name + "' is too large for one stream I/O operation."
+        );
+    }
+
+    return static_cast<std::streamsize>(bytes);
 }
 
 void require_non_empty_name(const std::string& name, const std::string& field){
@@ -134,6 +165,8 @@ Tensor load_tensor(
     const TensorMetadata& metadata,
     const std::filesystem::path& weights_path
 ){
+    require_float32(metadata);
+
     if(metadata.offset_bytes > weights_size ||
        metadata.byte_size > weights_size - metadata.offset_bytes){
         throw std::runtime_error(
@@ -141,7 +174,7 @@ Tensor load_tensor(
         );
     }
 
-    const uint64_t numel64 = metadata.byte_size / sizeof(float);
+    const uint64_t numel64 = metadata.byte_size / element_size(metadata.dtype);
 
     if(numel64 > std::numeric_limits<size_t>::max()){
         throw std::runtime_error("Tensor '" + metadata.name + "' is too large for this platform.");
@@ -162,7 +195,7 @@ Tensor load_tensor(
     if(metadata.byte_size != 0){
         weights.read(
             reinterpret_cast<char*>(data.data()),
-            static_cast<std::streamsize>(metadata.byte_size)
+            checked_streamsize(metadata.byte_size, metadata.name)
         );
 
         if(!weights){
@@ -180,9 +213,17 @@ void write_tensor_data(std::ofstream& weights, const NamedTensor& named_tensor){
         return;
     }
 
+    const Tensor* source = &named_tensor.tensor;
+    std::optional<Tensor> materialized;
+
+    if(!source->is_contiguous()){
+        materialized.emplace(source->clone());
+        source = &*materialized;
+    }
+
     weights.write(
-        reinterpret_cast<const char*>(named_tensor.tensor.data()),
-        static_cast<std::streamsize>(bytes)
+        reinterpret_cast<const char*>(source->data()),
+        checked_streamsize(bytes, named_tensor.name)
     );
 
     if(!weights){
@@ -347,15 +388,17 @@ ModelMetadata ModelLoader::parse_manifest(const std::filesystem::path& manifest_
             );
             const uint64_t numel = checked_numel(shape, manifest_path, line_number);
 
-            if(numel > std::numeric_limits<uint64_t>::max() / sizeof(float)){
+            const size_t item_size = element_size(DataType::Float32);
+
+            if(numel > std::numeric_limits<uint64_t>::max() / item_size){
                 throw_parse_error(manifest_path, line_number, "tensor byte size overflows uint64");
             }
 
-            if(bytes != numel * sizeof(float)){
+            if(bytes != numel * item_size){
                 throw_parse_error(manifest_path, line_number, "tensor byte size does not match shape");
             }
 
-            if(offset % sizeof(float) != 0){
+            if(offset % element_alignment(DataType::Float32) != 0){
                 throw_parse_error(manifest_path, line_number, "tensor offset is not float aligned");
             }
 
@@ -571,12 +614,13 @@ void ModelWriter::save(
 
     for(const NamedTensor& tensor : package.tensors){
         const uint64_t bytes = tensor_byte_size(tensor.tensor);
-        write_infos.push_back(TensorWriteInfo{&tensor, offset, bytes});
-        write_tensor_data(weights, tensor);
 
         if(bytes > std::numeric_limits<uint64_t>::max() - offset){
             throw std::runtime_error("Tensor data exceeds uint64 max size.");
         }
+
+        write_infos.push_back(TensorWriteInfo{&tensor, offset, bytes});
+        write_tensor_data(weights, tensor);
 
         offset += bytes;
     }

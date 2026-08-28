@@ -5,7 +5,6 @@
 #include "operator_registry.h"
 
 #include <algorithm>
-#include <limits>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
@@ -13,27 +12,6 @@
 namespace tinyinfer{
 
 namespace{
-
-size_t checked_numel(const Shape& shape){
-    size_t total = 1;
-
-    for(size_t dim : shape){
-        if(dim != 0 && total > std::numeric_limits<size_t>::max() / dim){
-            throw std::overflow_error("Value element count overflows size_t.");
-        }
-        total *= dim;
-    }
-
-    return total;
-}
-
-size_t checked_bytes(size_t numel){
-    if(numel > std::numeric_limits<size_t>::max() / sizeof(float)){
-        throw std::overflow_error("Value byte size overflows size_t.");
-    }
-
-    return numel * sizeof(float);
-}
 
 ValueRole classify_value(const Graph& graph, const std::string& name){
     if(name == graph.input_name()){
@@ -94,15 +72,20 @@ SessionState SessionState::build(
         const ValueIndex index = static_cast<ValueIndex>(i);
         const std::string name(plan.value_names_.name(index));
         const Shape& shape = state.graph_.shape(name);
-        const size_t numel = checked_numel(shape);
+        const ValueRole role = classify_value(state.graph_, name);
+        const DataType dtype = role == ValueRole::Initializer
+            ? state.graph_.constant(name).dtype()
+            : DataType::Float32;
+        const size_t numel = tensor_numel(shape);
 
         plan.values_.push_back(ValueInfo{
             name,
             shape,
-            classify_value(state.graph_, name),
+            dtype,
+            role,
             name == state.graph_.output_name(),
             numel,
-            checked_bytes(numel),
+            tensor_bytes(shape, dtype),
             lifetime_npos,
             lifetime_npos,
             lifetime_npos,

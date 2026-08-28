@@ -131,6 +131,7 @@ std::string ExecutionPlan::dump_memory_plan() const{
     for(const ValueInfo& info : values_){
         oss << "    " << info.name
             << ": shape=" << shape_to_string(info.shape)
+            << ", dtype=" << data_type_name(info.dtype)
             << ", numel=" << info.numel
             << ", bytes=" << info.byte_size
             << ", role=" << role_to_string(info.role)

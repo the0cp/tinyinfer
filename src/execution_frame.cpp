@@ -142,7 +142,10 @@ std::string ExecutionFrame::dump_values() const{
 
         const Tensor& tensor = value(index);
         oss << "shape=" << shape_to_string(tensor.shape())
+            << ", dtype=" << data_type_name(tensor.dtype())
             << ", numel=" << tensor.numel()
+            << ", layout=" << (tensor.is_contiguous() ? "contiguous" : "strided")
+            << ", byte_offset=" << tensor.byte_offset()
             << (values_[index].borrowed ? ", storage=borrowed" : ", storage=owned")
             << "\n";
     }

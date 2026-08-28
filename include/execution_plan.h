@@ -23,6 +23,7 @@ inline constexpr size_t lifetime_npos = static_cast<size_t>(-1);
 struct ValueInfo{  // Represents metadata about a value in the execution plan
     std::string name;
     Shape shape;
+    DataType dtype = DataType::Float32;
     ValueRole role = ValueRole::Intermediate;
     bool is_graph_output = false;
     size_t numel = 0;

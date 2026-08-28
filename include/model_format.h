@@ -1,5 +1,6 @@
 #pragma once
 
+#include "data_type.h"
 #include "graph.h"
 
 #include <cstdint>
@@ -9,9 +10,7 @@
 
 namespace tinyinfer{
 
-enum class TensorDataType{
-    Float32
-};
+using TensorDataType = DataType;
 
 struct TensorMetadata{
     std::string name;
