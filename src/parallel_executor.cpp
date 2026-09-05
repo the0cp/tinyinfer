@@ -44,6 +44,10 @@ void ParallelExecutor::execute(
     ExecutionFrame& frame,
     RunProfiler* profiler
 ) const{
+    if(session_state.memory_plan().policy() == MemoryPlanningPolicy::SequentialReuse){
+        throw std::logic_error("ParallelExecutor cannot execute a sequential-reuse MemoryPlan.");
+    }
+
     if(pool_.is_current_worker_thread()){
         throw std::logic_error(
             "ParallelExecutor cannot be entered from a worker of its own ThreadPool."
@@ -117,6 +121,7 @@ void ParallelExecutor::execute(
 
                         OpKernelContext context(node, frame);
                         session_state.kernel(node.kernel_index).compute(context);
+                        context.validate_output();
 
                         {
                             std::lock_guard<std::mutex> lock(state.mutex);

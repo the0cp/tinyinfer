@@ -12,28 +12,39 @@ namespace{
 class LinearKernel final : public OpKernel{
 public:
     void compute(OpKernelContext& context) const override{
-        context.set_output(linear(context.input(0), context.input(1), context.input(2)));
+        const Tensor& input = context.input(0);
+        const Tensor& weight = context.input(1);
+        const Tensor& bias = context.input(2);
+        Tensor& output = context.output();
+        linear_out(input, weight, bias, output);
     }
 };
 
 class ReluKernel final : public OpKernel{
 public:
     void compute(OpKernelContext& context) const override{
-        context.set_output(relu(context.input(0)));
+        const Tensor& input = context.input(0);
+        Tensor& output = context.output();
+        relu_out(input, output);
     }
 };
 
 class SoftmaxKernel final : public OpKernel{
 public:
     void compute(OpKernelContext& context) const override{
-        context.set_output(softmax(context.input(0)));
+        const Tensor& input = context.input(0);
+        Tensor& output = context.output();
+        softmax_out(input, output);
     }
 };
 
 class AddKernel final : public OpKernel{
 public:
     void compute(OpKernelContext& context) const override{
-        context.set_output(add(context.input(0), context.input(1)));
+        const Tensor& left = context.input(0);
+        const Tensor& right = context.input(1);
+        Tensor& output = context.output();
+        add_out(left, right, output);
     }
 };
 

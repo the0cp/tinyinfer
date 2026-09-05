@@ -121,6 +121,12 @@ std::string RunProfile::summary() const{
         << ", peak_live_bytes=" << peak_live_bytes
         << ", live_bytes_at_finish=" << live_bytes_at_finish
         << "\n";
+    oss << "  managed memory: buffer_allocations=" << managed_buffer_allocations
+        << ", allocated_bytes=" << managed_allocated_bytes
+        << ", legacy_submissions=" << legacy_output_submissions
+        << ", planned_values=" << planned_value_count
+        << ", reuses=" << memory_reuse_count
+        << "\n";
 
     if(!error.empty()){
         oss << "  error: " << error << "\n";
@@ -368,6 +374,44 @@ void RunProfiler::value_released(ValueIndex index, size_t bytes){
         bytes,
         current_live_bytes_
     });
+}
+
+void RunProfiler::managed_buffer_allocated(size_t bytes){
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if(profile_.managed_buffer_allocations == std::numeric_limits<size_t>::max() ||
+       profile_.managed_allocated_bytes > std::numeric_limits<size_t>::max() - bytes){
+        throw std::overflow_error("Profiler managed allocation counter overflow.");
+    }
+
+    profile_.managed_buffer_allocations++;
+    profile_.managed_allocated_bytes += bytes;
+}
+
+void RunProfiler::legacy_output_submitted(){
+    std::lock_guard<std::mutex> lock(mutex_);
+    if(profile_.legacy_output_submissions == std::numeric_limits<size_t>::max()){
+        throw std::overflow_error("Profiler legacy submission counter overflow.");
+    }
+    profile_.legacy_output_submissions++;
+}
+
+void RunProfiler::memory_plan_applied(
+    size_t buffer_count,
+    size_t arena_bytes,
+    size_t planned_value_count,
+    size_t reuse_count
+){
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if(profile_.managed_buffer_allocations != 0 || profile_.managed_allocated_bytes != 0){
+        throw std::logic_error("Profiler received a MemoryPlan after managed allocation began.");
+    }
+
+    profile_.managed_buffer_allocations = buffer_count;
+    profile_.managed_allocated_bytes = arena_bytes;
+    profile_.planned_value_count = planned_value_count;
+    profile_.memory_reuse_count = reuse_count;
 }
 
 void RunProfiler::finish(bool success, std::string error){

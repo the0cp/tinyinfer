@@ -82,8 +82,21 @@ void InferenceSession::initialize(){
     }
 
     candidate.resolve(input_name_, input_shape_, output_name_, operator_registry_);
+    MemoryPlanningPolicy memory_policy = MemoryPlanningPolicy::Disabled;
+
+    if(options_.enable_memory_planning){
+        memory_policy = options_.execution_mode == ExecutionMode::Sequential
+            ? MemoryPlanningPolicy::SequentialReuse
+            : MemoryPlanningPolicy::Dedicated;
+    }
+
     auto new_state = std::make_unique<SessionState>(
-        SessionState::build(std::move(candidate), operator_registry_, kernel_registry_)
+        SessionState::build(
+            std::move(candidate),
+            operator_registry_,
+            kernel_registry_,
+            memory_policy
+        )
     );
 
     std::unique_ptr<ThreadPool> new_pool;

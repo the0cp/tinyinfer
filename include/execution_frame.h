@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arena.h"
 #include "session_state.h"
 
 #include <optional>
@@ -24,6 +25,8 @@ public:
 
     bool has_value(ValueIndex index) const;
     const Tensor& value(ValueIndex index) const;
+    Tensor& allocate_output(ValueIndex index);
+    void validate_output(ValueIndex index) const;
     void set_value(ValueIndex index, Tensor tensor);
     void release(ValueIndex index);
 
@@ -42,6 +45,7 @@ private:
 
     const SessionState& session_state_;
     RunProfiler* profiler_ = nullptr;
+    std::optional<Arena> arena_;
     std::vector<ValueSlot> values_;
 };
 

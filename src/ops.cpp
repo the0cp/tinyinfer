@@ -2,22 +2,69 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
 namespace tinyinfer{
 
-Tensor add(const Tensor& a, const Tensor& b){
+namespace{
+
+void require_output(const Tensor& out, const Shape& shape, const char* operation){
+    if(out.shape() != shape){
+        throw std::runtime_error(std::string(operation) + " output shape mismatch.");
+    }
+    if(out.dtype() != DataType::Float32 || !out.is_contiguous()){
+        throw std::runtime_error(std::string(operation) + " requires contiguous float32 output.");
+    }
+}
+
+void require_disjoint_input(const Tensor& input, const Tensor& out, const char* operation){
+    if(input.dtype() != DataType::Float32 || !input.is_contiguous()){
+        throw std::runtime_error(std::string(operation) + " requires contiguous float32 input.");
+    }
+    const size_t input_bytes = input.size_bytes();
+    const size_t output_bytes = out.size_bytes();
+    if(input_bytes == 0 || output_bytes == 0){
+        return;
+    }
+
+    const auto input_address = reinterpret_cast<std::uintptr_t>(input.data());
+    const auto output_address = reinterpret_cast<std::uintptr_t>(out.data());
+    // Subtraction avoids overflowing an end-address calculation. Checking real
+    // ranges also covers partial overlap and separately wrapped external memory.
+    const bool overlaps = input_address <= output_address
+        ? output_address - input_address < input_bytes
+        : input_address - output_address < output_bytes;
+    if(overlaps){
+        throw std::invalid_argument(std::string(operation) + " input/output ranges overlap.");
+    }
+}
+
+}
+
+void add_out(const Tensor& a, const Tensor& b, Tensor& out){
     if(a.shape() != b.shape()){
         throw std::runtime_error("add shape mismatch.");
     }
+    require_output(out, a.shape(), "add");
+    require_disjoint_input(a, out, "add");
+    require_disjoint_input(b, out, "add");
 
-    Tensor out(a.shape());
-
-    for(size_t i = 0; i < a.numel(); i++){
-        out.data()[i] = a.data()[i] + b.data()[i];
+    const size_t count = a.numel();
+    const float* left = a.data();
+    const float* right = b.data();
+    float* destination = out.data();
+    for(size_t i = 0; i < count; i++){
+        destination[i] = left[i] + right[i];
     }
+}
+
+Tensor add(const Tensor& a, const Tensor& b){
+    Tensor out(a.shape());
+    add_out(a, b, out);
 
     return out;
 }
@@ -40,12 +87,21 @@ Tensor transpose_2d(const Tensor& x){
     return out;
 }
 
+void relu_out(const Tensor& x, Tensor& out){
+    require_output(out, x.shape(), "relu");
+    require_disjoint_input(x, out, "relu");
+
+    const size_t count = x.numel();
+    const float* source = x.data();
+    float* destination = out.data();
+    for(size_t i = 0; i < count; i++){
+        destination[i] = std::max(0.0f, source[i]);
+    }
+}
+
 Tensor relu(const Tensor& x){
     Tensor out(x.shape());
-
-    for(size_t i = 0; i < x.numel(); i++){
-        out.data()[i] = std::max(0.0f, x.data()[i]);
-    }
+    relu_out(x, out);
 
     return out;
 }
@@ -334,11 +390,68 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
     return out;
 }
 
-Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
-    return add_bias(fast_matmul(x, weight), bias);
+void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out){
+    if(x.dim() != 2 || weight.dim() != 2){
+        throw std::runtime_error("linear expects 2D input and weight tensors.");
+    }
+    if(bias.dim() != 1){
+        throw std::runtime_error("linear expects a 1D bias tensor.");
+    }
+
+    const size_t batch = x.shape()[0];
+    const size_t input_features = x.shape()[1];
+    if(weight.shape()[0] != input_features){
+        throw std::runtime_error("linear input and weight shapes do not match.");
+    }
+
+    const size_t output_features = weight.shape()[1];
+    if(bias.shape()[0] != output_features){
+        throw std::runtime_error("linear weight and bias shapes do not match.");
+    }
+
+    require_output(out, Shape{batch, output_features}, "linear");
+    require_disjoint_input(x, out, "linear");
+    require_disjoint_input(weight, out, "linear");
+    require_disjoint_input(bias, out, "linear");
+    if(out.numel() == 0){
+        return;
+    }
+    out.fill(0.0f);
+
+    const float* x_data = x.data();
+    const float* weight_data = weight.data();
+    const float* bias_data = bias.data();
+    float* out_data = out.data();
+
+    for(size_t row = 0; row < batch; row++){
+        float* out_row = out_data + row * output_features;
+
+        for(size_t inner = 0; inner < input_features; inner++){
+            const float x_value = x_data[row * input_features + inner];
+            const float* weight_row = weight_data + inner * output_features;
+
+            for(size_t column = 0; column < output_features; column++){
+                out_row[column] += x_value * weight_row[column];
+            }
+        }
+
+        for(size_t column = 0; column < output_features; column++){
+            out_row[column] += bias_data[column];
+        }
+    }
 }
 
-Tensor softmax(const Tensor& x){
+Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
+    if(x.dim() != 2 || weight.dim() != 2){
+        throw std::runtime_error("linear expects 2D input and weight tensors.");
+    }
+
+    Tensor out({x.shape()[0], weight.shape()[1]});
+    linear_out(x, weight, bias, out);
+    return out;
+}
+
+void softmax_out(const Tensor& x, Tensor& out){
     if(x.dim() != 2){
         throw std::runtime_error("softmax expects a 2D tensor.");
     }
@@ -349,12 +462,15 @@ Tensor softmax(const Tensor& x){
     if(features == 0){
         throw std::runtime_error("softmax requires a non-empty feature dimension.");
     }
+    require_output(out, x.shape(), "softmax");
+    require_disjoint_input(x, out, "softmax");
 
-    Tensor out(x.shape());
+    const float* source = x.data();
+    float* destination = out.data();
 
     for(size_t i = 0; i < batch; i++){
-        const float* x_row = x.data() + i * features;
-        float* out_row = out.data() + i * features;
+        const float* x_row = source + i * features;
+        float* out_row = destination + i * features;
         float max_value = x_row[0];
 
         for(size_t j = 1; j < features; j++){
@@ -372,6 +488,11 @@ Tensor softmax(const Tensor& x){
             out_row[j] /= sum;
         }
     }
+}
+
+Tensor softmax(const Tensor& x){
+    Tensor out(x.shape());
+    softmax_out(x, out);
 
     return out;
 }

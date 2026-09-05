@@ -157,7 +157,7 @@ std::string ExecutionPlan::dump_memory_plan() const{
     oss << "    initializer: " << initializer_bytes << "\n";
     oss << "    intermediate: " << intermediate_bytes << "\n";
     oss << "    output: " << output_bytes << "\n";
-    oss << "  note: buffer allocation/reuse is intentionally deferred to MemoryPlanner.\n";
+    oss << "  note: physical assignments are available from SessionState::dump_memory_plan().\n";
     return oss.str();
 }
 

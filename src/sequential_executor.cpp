@@ -26,6 +26,7 @@ void SequentialExecutor::execute(
         try{
             OpKernelContext context(node, frame);
             session_state.kernel(node.kernel_index).compute(context);
+            context.validate_output();
 
             for(ValueIndex value : node.release_after_execute){
                 frame.release(value);

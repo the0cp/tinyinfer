@@ -34,7 +34,8 @@ SessionState::~SessionState() = default;
 SessionState SessionState::build(
     Graph graph,
     const OperatorRegistry& operator_registry,
-    const KernelRegistry& kernel_registry
+    const KernelRegistry& kernel_registry,
+    MemoryPlanningPolicy memory_policy
 ){
     if(!graph.is_resolved()){
         throw std::logic_error("Cannot build SessionState from an unresolved Graph.");
@@ -181,6 +182,8 @@ SessionState SessionState::build(
         }
     }
 
+    state.memory_plan_ = MemoryPlanner::build(plan, memory_policy);
+
     return state;
 }
 
@@ -190,6 +193,14 @@ const Graph& SessionState::graph() const noexcept{
 
 const ExecutionPlan& SessionState::execution_plan() const noexcept{
     return execution_plan_;
+}
+
+const MemoryPlan& SessionState::memory_plan() const noexcept{
+    return memory_plan_;
+}
+
+std::string SessionState::dump_memory_plan() const{
+    return memory_plan_.dump(execution_plan_);
 }
 
 const OpKernel& SessionState::kernel(size_t index) const{

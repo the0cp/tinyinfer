@@ -41,6 +41,8 @@ add_library(tinyinfer
     src/graph.cpp
     src/graph_optimizer.cpp
     src/execution_plan.cpp
+    src/memory_plan.cpp
+    src/arena.cpp
     src/session_state.cpp
     src/profiler.cpp
     src/execution_frame.cpp
@@ -70,10 +72,14 @@ target_link_libraries(test_runtime PRIVATE tinyinfer)
 add_executable(test_tensor_storage tests/test_tensor_storage.cpp)
 target_link_libraries(test_tensor_storage PRIVATE tinyinfer)
 
+add_executable(test_memory_plan tests/test_memory_plan.cpp)
+target_link_libraries(test_memory_plan PRIVATE tinyinfer)
+
 enable_testing()
 add_test(NAME test_ops COMMAND test_ops)
 add_test(NAME test_runtime COMMAND test_runtime)
 add_test(NAME test_tensor_storage COMMAND test_tensor_storage)
+add_test(NAME test_memory_plan COMMAND test_memory_plan)
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)
@@ -107,3 +113,6 @@ target_link_libraries(bench_profiler PRIVATE tinyinfer)
 
 add_executable(bench_tensor_storage benchmark/bench_tensor_storage.cpp)
 target_link_libraries(bench_tensor_storage PRIVATE tinyinfer)
+
+add_executable(bench_memory_plan benchmark/bench_memory_plan.cpp)
+target_link_libraries(bench_memory_plan PRIVATE tinyinfer)

@@ -2,6 +2,7 @@
 
 #include "execution_plan.h"
 #include "graph.h"
+#include "memory_plan.h"
 
 #include <memory>
 #include <vector>
@@ -23,11 +24,14 @@ public:
     static SessionState build(
         Graph graph,
         const OperatorRegistry& operator_registry,
-        const KernelRegistry& kernel_registry
+        const KernelRegistry& kernel_registry,
+        MemoryPlanningPolicy memory_policy = MemoryPlanningPolicy::Disabled
     );
 
     const Graph& graph() const noexcept;
     const ExecutionPlan& execution_plan() const noexcept;
+    const MemoryPlan& memory_plan() const noexcept;
+    std::string dump_memory_plan() const;
     const OpKernel& kernel(size_t index) const;
 
     const Tensor* initializer(ValueIndex index) const;
@@ -38,6 +42,7 @@ private:
 
     Graph graph_;
     ExecutionPlan execution_plan_;
+    MemoryPlan memory_plan_;
     std::vector<std::unique_ptr<OpKernel>> kernels_;
 };
 
