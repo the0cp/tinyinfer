@@ -222,7 +222,15 @@ void test_profile_kernel_failure(){
     KernelRegistry kernels(false);
     kernels.register_kernel(
         OpType::ReLU,
-        [](const Node&){ return std::make_unique<ProfileThrowKernel>(); }
+        KernelCandidate{
+            .name = "test.profile_throw",
+            .threading = KernelThreading::Serial,
+            .priority = 0,
+            .match = [](const KernelSelectionContext&){ return KernelMatch::accept(0); },
+            .factory = [](const Node&, const KernelSelectionContext&){
+                return std::make_unique<ProfileThrowKernel>();
+            }
+        }
     );
 
     Graph graph;

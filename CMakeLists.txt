@@ -36,6 +36,7 @@ add_library(tinyinfer
     src/tensor.cpp
     src/ops.cpp
     src/thread_pool.cpp
+    src/threading_policy.cpp
     src/value_index.cpp
     src/operator_registry.cpp
     src/graph.cpp
@@ -48,6 +49,7 @@ add_library(tinyinfer
     src/execution_frame.cpp
     src/op_kernel.cpp
     src/kernel_registry.cpp
+    src/builtin_kernels.cpp
     src/sequential_executor.cpp
     src/parallel_executor.cpp
     src/inference_session.cpp
@@ -75,11 +77,19 @@ target_link_libraries(test_tensor_storage PRIVATE tinyinfer)
 add_executable(test_memory_plan tests/test_memory_plan.cpp)
 target_link_libraries(test_memory_plan PRIVATE tinyinfer)
 
+add_executable(test_threading_policy tests/test_threading_policy.cpp)
+target_link_libraries(test_threading_policy PRIVATE tinyinfer)
+
+add_executable(test_kernel_selection tests/test_kernel_selection.cpp)
+target_link_libraries(test_kernel_selection PRIVATE tinyinfer)
+
 enable_testing()
 add_test(NAME test_ops COMMAND test_ops)
 add_test(NAME test_runtime COMMAND test_runtime)
 add_test(NAME test_tensor_storage COMMAND test_tensor_storage)
 add_test(NAME test_memory_plan COMMAND test_memory_plan)
+add_test(NAME test_threading_policy COMMAND test_threading_policy)
+add_test(NAME test_kernel_selection COMMAND test_kernel_selection)
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)
@@ -116,3 +126,6 @@ target_link_libraries(bench_tensor_storage PRIVATE tinyinfer)
 
 add_executable(bench_memory_plan benchmark/bench_memory_plan.cpp)
 target_link_libraries(bench_memory_plan PRIVATE tinyinfer)
+
+add_executable(bench_kernel_selection benchmark/bench_kernel_selection.cpp)
+target_link_libraries(bench_kernel_selection PRIVATE tinyinfer)

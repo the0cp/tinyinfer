@@ -43,6 +43,73 @@ void require_disjoint_input(const Tensor& input, const Tensor& out, const char* 
     }
 }
 
+struct LinearDimensions{
+    size_t batch;
+    size_t input_features;
+    size_t output_features;
+};
+
+LinearDimensions prepare_linear(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor& bias,
+    Tensor& out
+){
+    if(x.dim() != 2 || weight.dim() != 2){
+        throw std::runtime_error("linear expects 2D input and weight tensors.");
+    }
+    if(bias.dim() != 1){
+        throw std::runtime_error("linear expects a 1D bias tensor.");
+    }
+
+    const LinearDimensions dimensions{x.shape()[0], x.shape()[1], weight.shape()[1]};
+    if(weight.shape()[0] != dimensions.input_features){
+        throw std::runtime_error("linear input and weight shapes do not match.");
+    }
+    if(bias.shape()[0] != dimensions.output_features){
+        throw std::runtime_error("linear weight and bias shapes do not match.");
+    }
+
+    require_output(out, Shape{dimensions.batch, dimensions.output_features}, "linear");
+    require_disjoint_input(x, out, "linear");
+    require_disjoint_input(weight, out, "linear");
+    require_disjoint_input(bias, out, "linear");
+    return dimensions;
+}
+
+void compute_linear_rows(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor& bias,
+    Tensor& out,
+    const LinearDimensions& dimensions,
+    size_t row_begin,
+    size_t row_end
+){
+    const float* x_data = x.data();
+    const float* weight_data = weight.data();
+    const float* bias_data = bias.data();
+    float* out_data = out.data();
+
+    for(size_t row = row_begin; row < row_end; row++){
+        float* out_row = out_data + row * dimensions.output_features;
+
+        for(size_t column = 0; column < dimensions.output_features; column++){
+            out_row[column] = bias_data[column];
+        }
+
+        for(size_t inner = 0; inner < dimensions.input_features; inner++){
+            const float x_value = x_data[row * dimensions.input_features + inner];
+            const float* weight_row =
+                weight_data + inner * dimensions.output_features;
+
+            for(size_t column = 0; column < dimensions.output_features; column++){
+                out_row[column] += x_value * weight_row[column];
+            }
+        }
+    }
+}
+
 }
 
 void add_out(const Tensor& a, const Tensor& b, Tensor& out){
@@ -326,40 +393,22 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
         return Tensor({m, n});
     }
 
-    if(num_tasks == 0){
-        num_tasks = pool.size();
-    }
-
-    num_tasks = std::min(num_tasks, m);
     Tensor out({m, n});
-    const size_t rows_per_task = (m + num_tasks - 1) / num_tasks;
+    pool.parallel_for(m, num_tasks, [&](size_t row_begin, size_t row_end){
+        for(size_t i = row_begin; i < row_end; i++){
+            const float* a_row = a.data() + i * k;
+            float* out_row = out.data() + i * n;
 
-    for(size_t task_id = 0; task_id < num_tasks; task_id++){
-        const size_t row_begin = task_id * rows_per_task;
-        const size_t row_end = std::min(row_begin + rows_per_task, m);
+            for(size_t p = 0; p < k; p++){
+                const float a_value = a_row[p];
+                const float* b_row = b.data() + p * n;
 
-        if(row_begin >= row_end){
-            break;
-        }
-
-        pool.enqueue([&, row_begin, row_end, k, n](){
-            for(size_t i = row_begin; i < row_end; i++){
-                const float* a_row = a.data() + i * k;
-                float* out_row = out.data() + i * n;
-
-                for(size_t p = 0; p < k; p++){
-                    const float a_value = a_row[p];
-                    const float* b_row = b.data() + p * n;
-
-                    for(size_t j = 0; j < n; j++){
-                        out_row[j] += a_value * b_row[j];
-                    }
+                for(size_t j = 0; j < n; j++){
+                    out_row[j] += a_value * b_row[j];
                 }
             }
-        });
-    }
-
-    pool.wait();
+        }
+    });
     return out;
 }
 
@@ -391,54 +440,41 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
 }
 
 void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out){
-    if(x.dim() != 2 || weight.dim() != 2){
-        throw std::runtime_error("linear expects 2D input and weight tensors.");
-    }
-    if(bias.dim() != 1){
-        throw std::runtime_error("linear expects a 1D bias tensor.");
-    }
-
-    const size_t batch = x.shape()[0];
-    const size_t input_features = x.shape()[1];
-    if(weight.shape()[0] != input_features){
-        throw std::runtime_error("linear input and weight shapes do not match.");
-    }
-
-    const size_t output_features = weight.shape()[1];
-    if(bias.shape()[0] != output_features){
-        throw std::runtime_error("linear weight and bias shapes do not match.");
-    }
-
-    require_output(out, Shape{batch, output_features}, "linear");
-    require_disjoint_input(x, out, "linear");
-    require_disjoint_input(weight, out, "linear");
-    require_disjoint_input(bias, out, "linear");
+    const LinearDimensions dimensions = prepare_linear(x, weight, bias, out);
     if(out.numel() == 0){
         return;
     }
-    out.fill(0.0f);
+    compute_linear_rows(x, weight, bias, out, dimensions, 0, dimensions.batch);
+}
 
-    const float* x_data = x.data();
-    const float* weight_data = weight.data();
-    const float* bias_data = bias.data();
-    float* out_data = out.data();
-
-    for(size_t row = 0; row < batch; row++){
-        float* out_row = out_data + row * output_features;
-
-        for(size_t inner = 0; inner < input_features; inner++){
-            const float x_value = x_data[row * input_features + inner];
-            const float* weight_row = weight_data + inner * output_features;
-
-            for(size_t column = 0; column < output_features; column++){
-                out_row[column] += x_value * weight_row[column];
-            }
-        }
-
-        for(size_t column = 0; column < output_features; column++){
-            out_row[column] += bias_data[column];
-        }
+void threadpool_linear_out(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor& bias,
+    Tensor& out,
+    ThreadPool& pool,
+    size_t num_tasks
+){
+    const LinearDimensions dimensions = prepare_linear(x, weight, bias, out);
+    if(out.numel() == 0){
+        return;
     }
+
+    pool.parallel_for(
+        dimensions.batch,
+        num_tasks,
+        [&](size_t row_begin, size_t row_end){
+            compute_linear_rows(
+                x,
+                weight,
+                bias,
+                out,
+                dimensions,
+                row_begin,
+                row_end
+            );
+        }
+    );
 }
 
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){

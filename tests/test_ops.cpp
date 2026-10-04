@@ -211,14 +211,23 @@ void test_operator_registry_schema_only(){
 
 void test_kernel_registry(){
     KernelRegistry builtins;
-    std::unique_ptr<OpKernel> kernel =
-        builtins.create_kernel(Node{"relu", OpType::ReLU, {"input"}, "output"});
-    expect(kernel != nullptr, "built-in kernel creation");
+    KernelSelectionContext context;
+    context.input_shapes.push_back({1, 2});
+    context.output_shape = {1, 2};
+    SelectedKernel selected = builtins.select_kernel(
+        Node{"relu", OpType::ReLU, {"input"}, "output"},
+        context
+    );
+    expect(selected.kernel != nullptr, "built-in kernel creation");
+    expect(selected.record.kernel_name == "cpu.relu.reference", "built-in kernel identity");
 
     KernelRegistry empty(false);
     expect_throw(
         [&](){
-            (void)empty.create_kernel(Node{"relu", OpType::ReLU, {"input"}, "output"});
+            (void)empty.select_kernel(
+                Node{"relu", OpType::ReLU, {"input"}, "output"},
+                context
+            );
         },
         "No CPU kernel"
     );
@@ -336,12 +345,25 @@ void test_parallel_failure_cancels_descendants(){
     std::atomic<size_t> fail_calls = 0;
     std::atomic<size_t> descendant_calls = 0;
     KernelRegistry kernels(false);
-    kernels.register_kernel(OpType::ReLU, [&](const Node& node){
-        if(node.name == "fail"){
-            return std::unique_ptr<OpKernel>(std::make_unique<ThrowKernel>(fail_calls));
+    kernels.register_kernel(
+        OpType::ReLU,
+        KernelCandidate{
+            .name = "test.failure_by_node",
+            .threading = KernelThreading::Serial,
+            .priority = 0,
+            .match = [](const KernelSelectionContext&){ return KernelMatch::accept(0); },
+            .factory = [&](const Node& node, const KernelSelectionContext&){
+                if(node.name == "fail"){
+                    return std::unique_ptr<OpKernel>(
+                        std::make_unique<ThrowKernel>(fail_calls)
+                    );
+                }
+                return std::unique_ptr<OpKernel>(
+                    std::make_unique<CountKernel>(descendant_calls)
+                );
+            }
         }
-        return std::unique_ptr<OpKernel>(std::make_unique<CountKernel>(descendant_calls));
-    });
+    );
 
     SessionState state = SessionState::build(std::move(graph), operators, kernels);
     Tensor input({1, 2}, {-1.0f, 2.0f});

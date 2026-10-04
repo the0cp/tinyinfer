@@ -23,6 +23,14 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
 Tensor add_bias(const Tensor& x, const Tensor& bias);
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias);
 void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out);
+void threadpool_linear_out(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor& bias,
+    Tensor& out,
+    ThreadPool& pool,
+    size_t num_tasks
+);
 Tensor softmax(const Tensor& x);
 void softmax_out(const Tensor& x, Tensor& out);
 

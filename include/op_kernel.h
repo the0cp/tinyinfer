@@ -8,11 +8,16 @@
 namespace tinyinfer{
 
 class ExecutionFrame;
+class ThreadPool;
 struct NodeExecutionPlan;
 
 class OpKernelContext{
 public:
-    OpKernelContext(const NodeExecutionPlan& node_plan, ExecutionFrame& frame);
+    OpKernelContext(
+        const NodeExecutionPlan& node_plan,
+        ExecutionFrame& frame,
+        ThreadPool* intra_op_thread_pool = nullptr
+    );
 
     size_t input_count() const noexcept;
     const Tensor& input(size_t index) const;
@@ -23,10 +28,12 @@ public:
     void set_output(Tensor tensor);
     // Called by executors after compute(), before consumers may run.
     void validate_output() const;
+    ThreadPool* intra_op_thread_pool() const noexcept;
 
 private:
     const NodeExecutionPlan& node_plan_;
     ExecutionFrame& frame_;
+    ThreadPool* intra_op_thread_pool_ = nullptr;
     Tensor* output_ = nullptr;
     std::shared_ptr<Buffer> output_buffer_;
     size_t output_offset_ = 0;

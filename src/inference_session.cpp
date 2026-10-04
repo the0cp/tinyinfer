@@ -4,7 +4,6 @@
 #include "executor.h"
 #include "profiler.h"
 
-#include <algorithm>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -25,13 +24,7 @@ std::string current_exception_message(){
 
 }
 
-InferenceSession::InferenceSession(SessionOptions options)
-    : options_(options){
-    if(options_.execution_mode == ExecutionMode::Parallel && options_.inter_op_threads == 0){
-        const unsigned int hardware_threads = std::thread::hardware_concurrency();
-        options_.inter_op_threads = std::max<size_t>(1, hardware_threads);
-    }
-}
+InferenceSession::InferenceSession(SessionOptions options) : options_(options){}
 
 void InferenceSession::load(
     Graph graph,
@@ -49,7 +42,8 @@ void InferenceSession::load(
     output_name_ = std::move(output_name);
     metadata_.reset();
     session_state_.reset();
-    inter_op_thread_pool_.reset();
+    threading_plan_.reset();
+    worker_pool_.reset();
     lifecycle_ = SessionLifecycle::Loaded;
 }
 
@@ -82,10 +76,15 @@ void InferenceSession::initialize(){
     }
 
     candidate.resolve(input_name_, input_shape_, output_name_, operator_registry_);
+    const ThreadingPlan new_threading_plan = ThreadingPlan::build(
+        options_,
+        static_cast<size_t>(std::thread::hardware_concurrency())
+    );
     MemoryPlanningPolicy memory_policy = MemoryPlanningPolicy::Disabled;
 
     if(options_.enable_memory_planning){
-        memory_policy = options_.execution_mode == ExecutionMode::Sequential
+        memory_policy = new_threading_plan.effective_execution_mode() ==
+                ExecutionMode::Sequential
             ? MemoryPlanningPolicy::SequentialReuse
             : MemoryPlanningPolicy::Dedicated;
     }
@@ -95,18 +94,26 @@ void InferenceSession::initialize(){
             std::move(candidate),
             operator_registry_,
             kernel_registry_,
-            memory_policy
+            memory_policy,
+            new_threading_plan
         )
     );
+    std::unique_ptr<ThreadPool> new_worker_pool;
 
-    std::unique_ptr<ThreadPool> new_pool;
-
-    if(options_.execution_mode == ExecutionMode::Parallel){
-        new_pool = std::make_unique<ThreadPool>(options_.inter_op_threads);
+    if(new_threading_plan.effective_execution_mode() == ExecutionMode::Parallel){
+        new_worker_pool = std::make_unique<ThreadPool>(
+            new_threading_plan.effective_inter_op_threads()
+        );
+    }else if(new_threading_plan.effective_intra_op_threads() > 1 &&
+             new_state->requires_intra_op_thread_pool()){
+        new_worker_pool = std::make_unique<ThreadPool>(
+            new_threading_plan.effective_intra_op_threads()
+        );
     }
 
     session_state_ = std::move(new_state);
-    inter_op_thread_pool_ = std::move(new_pool);
+    threading_plan_ = new_threading_plan;
+    worker_pool_ = std::move(new_worker_pool);
     lifecycle_ = SessionLifecycle::Initialized;
 }
 
@@ -138,15 +145,15 @@ Tensor InferenceSession::run_impl(const Tensor& input, RunProfile* profile) cons
         ExecutionFrame frame(state, profiler.get());
         frame.bind_input(execution_plan.input_index(), input);
 
-        if(options_.execution_mode == ExecutionMode::Sequential){
-            SequentialExecutor executor;
+        if(threading_plan_->effective_execution_mode() == ExecutionMode::Sequential){
+            SequentialExecutor executor(worker_pool_.get());
             executor.execute(state, frame, profiler.get());
         }else{
-            if(!inter_op_thread_pool_){
+            if(!worker_pool_){
                 throw std::logic_error("Parallel InferenceSession has no inter-op ThreadPool.");
             }
 
-            ParallelExecutor executor(*inter_op_thread_pool_);
+            ParallelExecutor executor(*worker_pool_);
             executor.execute(state, frame, profiler.get());
         }
 
@@ -188,6 +195,16 @@ PassManager& InferenceSession::pass_manager(){
     return pass_manager_;
 }
 
+KernelRegistry& InferenceSession::kernel_registry(){
+    if(lifecycle_ == SessionLifecycle::Initialized){
+        throw std::logic_error(
+            "Kernels must be registered before InferenceSession initialization."
+        );
+    }
+
+    return kernel_registry_;
+}
+
 const Graph& InferenceSession::graph() const{
     if(session_state_){
         return session_state_->graph();
@@ -209,6 +226,11 @@ const SessionState& InferenceSession::session_state() const{
     return *session_state_;
 }
 
+const ThreadingPlan& InferenceSession::threading_plan() const{
+    require_initialized();
+    return *threading_plan_;
+}
+
 const ModelMetadata& InferenceSession::metadata() const{
     if(!metadata_){
         throw std::logic_error("InferenceSession was not loaded from a model package.");
@@ -218,7 +240,7 @@ const ModelMetadata& InferenceSession::metadata() const{
 }
 
 void InferenceSession::require_initialized() const{
-    if(lifecycle_ != SessionLifecycle::Initialized || !session_state_){
+    if(lifecycle_ != SessionLifecycle::Initialized || !session_state_ || !threading_plan_){
         throw std::logic_error("InferenceSession is not initialized.");
     }
 }

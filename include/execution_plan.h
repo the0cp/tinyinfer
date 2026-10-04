@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kernel_selection.h"
 #include "operator_registry.h"
 #include "tensor.h"
 #include "value_index.h"
@@ -39,6 +40,7 @@ struct NodeExecutionPlan{  // Represents the execution plan for a single node in
     std::string name;
     OpType op = OpType::ReLU;
     size_t kernel_index = 0;
+    KernelSelectionRecord kernel_selection;
     std::vector<ValueIndex> inputs;
     ValueIndex output = invalid_value_index;
     size_t dependency_count = 0;
@@ -66,6 +68,7 @@ public:
     std::string dump() const;
     std::string dump_memory_plan() const;
     std::string dump_scheduler_plan() const;
+    std::string dump_kernel_plan() const;
 
 private:
     friend class SessionState;  

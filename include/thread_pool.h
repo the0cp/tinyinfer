@@ -21,6 +21,13 @@ public:
 
     void enqueue(std::function<void()> task);
     void wait();
+    // Runs one independent task group and waits only for that group. Concurrent
+    // callers may submit separate groups to the same pool safely.
+    void parallel_for(
+        size_t work_items,
+        size_t task_count,
+        std::function<void(size_t begin, size_t end)> task
+    );
 
     bool is_current_worker_thread() const noexcept;
     size_t size() const;

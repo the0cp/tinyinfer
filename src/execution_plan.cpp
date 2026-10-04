@@ -112,7 +112,8 @@ std::string ExecutionPlan::dump() const{
         }
 
         oss << ") -> " << value_names_.name(node.output) << " "
-            << shape_to_string(shape(node.output)) << "\n";
+            << shape_to_string(shape(node.output))
+            << " [kernel=" << node.kernel_selection.kernel_name << "]\n";
     }
 
     return oss.str();
@@ -187,6 +188,28 @@ std::string ExecutionPlan::dump_scheduler_plan() const{
         }
 
         oss << "\n";
+    }
+
+    return oss.str();
+}
+
+std::string ExecutionPlan::dump_kernel_plan() const{
+    std::ostringstream oss;
+    oss << "Kernel plan:\n";
+
+    if(nodes_.empty()){
+        oss << "  <empty>\n";
+        return oss.str();
+    }
+
+    for(size_t position = 0; position < nodes_.size(); position++){
+        const NodeExecutionPlan& node = nodes_[position];
+        const KernelSelectionRecord& selection = node.kernel_selection;
+        oss << "  [" << position << "] " << node.name
+            << ": kernel=" << selection.kernel_name
+            << ", threading=" << kernel_threading_name(selection.threading)
+            << ", estimated_cost=" << selection.estimated_cost
+            << ", reason=" << selection.reason << "\n";
     }
 
     return oss.str();

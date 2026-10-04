@@ -8,8 +8,14 @@
 
 namespace tinyinfer{
 
-OpKernelContext::OpKernelContext(const NodeExecutionPlan& node_plan, ExecutionFrame& frame)
-    : node_plan_(node_plan), frame_(frame){}
+OpKernelContext::OpKernelContext(
+    const NodeExecutionPlan& node_plan,
+    ExecutionFrame& frame,
+    ThreadPool* intra_op_thread_pool
+)
+    : node_plan_(node_plan),
+      frame_(frame),
+      intra_op_thread_pool_(intra_op_thread_pool){}
 
 size_t OpKernelContext::input_count() const noexcept{
     return node_plan_.inputs.size();
@@ -48,6 +54,10 @@ void OpKernelContext::validate_output() const{
     if(output_ && (output_->buffer() != output_buffer_ || output_->byte_offset() != output_offset_)){
         throw std::logic_error("Kernel replaced runtime-provided output storage.");
     }
+}
+
+ThreadPool* OpKernelContext::intra_op_thread_pool() const noexcept{
+    return intra_op_thread_pool_;
 }
 
 }

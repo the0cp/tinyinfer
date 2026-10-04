@@ -1,90 +1,149 @@
 #include "kernel_registry.h"
 
-#include "ops.h"
+#include "builtin_kernels.h"
 
+#include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
 namespace tinyinfer{
 
-namespace{
-
-class LinearKernel final : public OpKernel{
-public:
-    void compute(OpKernelContext& context) const override{
-        const Tensor& input = context.input(0);
-        const Tensor& weight = context.input(1);
-        const Tensor& bias = context.input(2);
-        Tensor& output = context.output();
-        linear_out(input, weight, bias, output);
-    }
-};
-
-class ReluKernel final : public OpKernel{
-public:
-    void compute(OpKernelContext& context) const override{
-        const Tensor& input = context.input(0);
-        Tensor& output = context.output();
-        relu_out(input, output);
-    }
-};
-
-class SoftmaxKernel final : public OpKernel{
-public:
-    void compute(OpKernelContext& context) const override{
-        const Tensor& input = context.input(0);
-        Tensor& output = context.output();
-        softmax_out(input, output);
-    }
-};
-
-class AddKernel final : public OpKernel{
-public:
-    void compute(OpKernelContext& context) const override{
-        const Tensor& left = context.input(0);
-        const Tensor& right = context.input(1);
-        Tensor& output = context.output();
-        add_out(left, right, output);
-    }
-};
-
-}
-
 KernelRegistry::KernelRegistry(bool register_builtins){
-    if(!register_builtins){
-        return;
-    }
-
-    register_kernel(OpType::Linear, [](const Node&){ return std::make_unique<LinearKernel>(); });
-    register_kernel(OpType::ReLU, [](const Node&){ return std::make_unique<ReluKernel>(); });
-    register_kernel(OpType::Softmax, [](const Node&){ return std::make_unique<SoftmaxKernel>(); });
-    register_kernel(OpType::Add, [](const Node&){ return std::make_unique<AddKernel>(); });
-}
-
-void KernelRegistry::register_kernel(OpType type, KernelFactory factory){
-    if(!factory){
-        throw std::invalid_argument("Cannot register an empty kernel factory.");
-    }
-
-    if(!factories_.emplace(type, std::move(factory)).second){
-        throw std::runtime_error("Kernel type is already registered.");
+    if(register_builtins){
+        register_builtin_kernels(*this);
     }
 }
 
-std::unique_ptr<OpKernel> KernelRegistry::create_kernel(const Node& node) const{
-    auto it = factories_.find(node.op);
+void KernelRegistry::register_kernel(OpType type, KernelCandidate candidate){
+    if(candidate.name.empty()){
+        throw std::invalid_argument("Cannot register a kernel with an empty name.");
+    }
+    if(!candidate.match){
+        throw std::invalid_argument(
+            "Kernel '" + candidate.name + "' has no matcher."
+        );
+    }
+    if(!candidate.factory){
+        throw std::invalid_argument(
+            "Kernel '" + candidate.name + "' has an empty factory."
+        );
+    }
 
-    if(it == factories_.end()){
+    std::vector<KernelCandidate>& candidates = candidates_[type];
+    const auto duplicate = std::find_if(
+        candidates.begin(),
+        candidates.end(),
+        [&](const KernelCandidate& registered){
+            return registered.name == candidate.name;
+        }
+    );
+    if(duplicate != candidates.end()){
+        throw std::runtime_error(
+            "Kernel name is already registered for this operator: " +
+            candidate.name
+        );
+    }
+    candidates.push_back(std::move(candidate));
+}
+
+SelectedKernel KernelRegistry::select_kernel(
+    const Node& node,
+    const KernelSelectionContext& context
+) const{
+    const auto candidates_it = candidates_.find(node.op);
+    if(candidates_it == candidates_.end() || candidates_it->second.empty()){
         throw std::runtime_error("No CPU kernel is registered for node '" + node.name + "'.");
     }
 
-    std::unique_ptr<OpKernel> kernel = it->second(node);
+    struct RankedCandidate{
+        const KernelCandidate* candidate;
+        uint64_t cost;
+        size_t registration_order;
+    };
 
-    if(!kernel){
-        throw std::runtime_error("Kernel factory returned null for node '" + node.name + "'.");
+    const std::vector<KernelCandidate>& candidates = candidates_it->second;
+    std::vector<RankedCandidate> compatible;
+    compatible.reserve(candidates.size());
+    std::vector<std::string> rejections;
+    rejections.reserve(candidates.size());
+
+    for(size_t order = 0; order < candidates.size(); order++){
+        const KernelCandidate& candidate = candidates[order];
+        if(candidate.threading == KernelThreading::IntraOp &&
+           context.effective_intra_op_threads < 2){
+            rejections.push_back(
+                candidate.name + ": requires at least two effective intra-op threads"
+            );
+            continue;
+        }
+
+        const KernelMatch match = candidate.match(context);
+        if(!match.supported){
+            rejections.push_back(
+                candidate.name + ": " +
+                (match.rejection.empty() ? "unsupported" : match.rejection)
+            );
+            continue;
+        }
+        compatible.push_back(RankedCandidate{&candidate, match.estimated_cost, order});
     }
 
-    return kernel;
+    if(compatible.empty()){
+        std::ostringstream message;
+        message << "No compatible CPU kernel for node '" << node.name << "'.";
+        for(const std::string& rejection : rejections){
+            message << "\n  - " << rejection;
+        }
+        throw std::runtime_error(message.str());
+    }
+
+    std::sort(
+        compatible.begin(),
+        compatible.end(),
+        [](const RankedCandidate& left, const RankedCandidate& right){
+            if(left.cost != right.cost){
+                return left.cost < right.cost;
+            }
+            if(left.candidate->priority != right.candidate->priority){
+                return left.candidate->priority > right.candidate->priority;
+            }
+            return left.registration_order < right.registration_order;
+        }
+    );
+
+    const RankedCandidate& best = compatible.front();
+    std::string reason = "only compatible candidate";
+    if(compatible.size() > 1){
+        const RankedCandidate& runner_up = compatible[1];
+        if(best.cost != runner_up.cost){
+            reason = "lowest estimated cost: " + std::to_string(best.cost) + " < " +
+                std::to_string(runner_up.cost);
+        }else if(best.candidate->priority != runner_up.candidate->priority){
+            reason = "equal cost; higher priority: " +
+                std::to_string(best.candidate->priority) + " > " +
+                std::to_string(runner_up.candidate->priority);
+        }else{
+            reason = "equal cost and priority; earlier registration wins";
+        }
+    }
+
+    std::unique_ptr<OpKernel> kernel = best.candidate->factory(node, context);
+    if(!kernel){
+        throw std::runtime_error(
+            "Kernel factory returned null for candidate '" + best.candidate->name + "'."
+        );
+    }
+
+    return SelectedKernel{
+        std::move(kernel),
+        KernelSelectionRecord{
+            best.candidate->name,
+            best.candidate->threading,
+            best.cost,
+            std::move(reason)
+        }
+    };
 }
 
 }

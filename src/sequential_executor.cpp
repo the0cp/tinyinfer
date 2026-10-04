@@ -8,6 +8,9 @@
 
 namespace tinyinfer{
 
+SequentialExecutor::SequentialExecutor(ThreadPool* intra_op_thread_pool)
+    : intra_op_thread_pool_(intra_op_thread_pool){}
+
 void SequentialExecutor::execute(
     const SessionState& session_state,
     ExecutionFrame& frame,
@@ -24,7 +27,17 @@ void SequentialExecutor::execute(
         }
 
         try{
-            OpKernelContext context(node, frame);
+            ThreadPool* kernel_pool = nullptr;
+            if(node.kernel_selection.threading == KernelThreading::IntraOp){
+                if(!intra_op_thread_pool_){
+                    throw std::logic_error(
+                        "Compiled intra-op kernel has no runtime ThreadPool."
+                    );
+                }
+                kernel_pool = intra_op_thread_pool_;
+            }
+
+            OpKernelContext context(node, frame, kernel_pool);
             session_state.kernel(node.kernel_index).compute(context);
             context.validate_output();
 

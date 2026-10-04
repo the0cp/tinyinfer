@@ -211,7 +211,15 @@ void test_legacy_set_output_is_a_correctness_fallback(){
     KernelRegistry kernels(false);
     kernels.register_kernel(
         OpType::ReLU,
-        [](const Node&){ return std::make_unique<LegacyReluKernel>(); }
+        KernelCandidate{
+            .name = "test.legacy_relu",
+            .threading = KernelThreading::Serial,
+            .priority = 0,
+            .match = [](const KernelSelectionContext&){ return KernelMatch::accept(0); },
+            .factory = [](const Node&, const KernelSelectionContext&){
+                return std::make_unique<LegacyReluKernel>();
+            }
+        }
     );
 
     Graph graph = make_relu_chain(1);
@@ -288,7 +296,18 @@ public:
 void test_executors_validate_kernel_binding(){
     OperatorRegistry operators;
     KernelRegistry kernels(false);
-    kernels.register_kernel(OpType::ReLU, [](const Node&){ return std::make_unique<ReplacingKernel>(); });
+    kernels.register_kernel(
+        OpType::ReLU,
+        KernelCandidate{
+            .name = "test.replacing_relu",
+            .threading = KernelThreading::Serial,
+            .priority = 0,
+            .match = [](const KernelSelectionContext&){ return KernelMatch::accept(0); },
+            .factory = [](const Node&, const KernelSelectionContext&){
+                return std::make_unique<ReplacingKernel>();
+            }
+        }
+    );
     Graph graph = make_relu_chain(1);
     graph.resolve("input", {1, 4}, "v0", operators);
     auto state = SessionState::build(std::move(graph), operators, kernels, MemoryPlanningPolicy::Dedicated);

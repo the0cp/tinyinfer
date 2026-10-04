@@ -3,6 +3,7 @@
 #include "kernel_registry.h"
 #include "op_kernel.h"
 #include "operator_registry.h"
+#include "threading_policy.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -36,6 +37,23 @@ SessionState SessionState::build(
     const OperatorRegistry& operator_registry,
     const KernelRegistry& kernel_registry,
     MemoryPlanningPolicy memory_policy
+){
+    const ThreadingPlan default_threading = ThreadingPlan::build(SessionOptions{}, 1);
+    return build(
+        std::move(graph),
+        operator_registry,
+        kernel_registry,
+        memory_policy,
+        default_threading
+    );
+}
+
+SessionState SessionState::build(
+    Graph graph,
+    const OperatorRegistry& operator_registry,
+    const KernelRegistry& kernel_registry,
+    MemoryPlanningPolicy memory_policy,
+    const ThreadingPlan& threading_plan
 ){
     if(!graph.is_resolved()){
         throw std::logic_error("Cannot build SessionState from an unresolved Graph.");
@@ -77,6 +95,11 @@ SessionState SessionState::build(
         const DataType dtype = role == ValueRole::Initializer
             ? state.graph_.constant(name).dtype()
             : DataType::Float32;
+        if(role == ValueRole::Initializer && !state.graph_.constant(name).is_contiguous()){
+            throw std::runtime_error(
+                "Compiled runtime requires contiguous initializer '" + name + "'."
+            );
+        }
         const size_t numel = tensor_numel(shape);
 
         plan.values_.push_back(ValueInfo{
@@ -131,7 +154,18 @@ SessionState SessionState::build(
         }
 
         node_plan.dependency_count = unique_dependencies.size();
-        state.kernels_.push_back(kernel_registry.create_kernel(node));
+        KernelSelectionContext selection_context;
+        selection_context.input_shapes.reserve(node_plan.inputs.size());
+        for(ValueIndex input : node_plan.inputs){
+            selection_context.input_shapes.push_back(plan.value_info(input).shape);
+        }
+        selection_context.output_shape = plan.value_info(node_plan.output).shape;
+        selection_context.effective_intra_op_threads =
+            threading_plan.effective_intra_op_threads();
+
+        SelectedKernel selected = kernel_registry.select_kernel(node, selection_context);
+        node_plan.kernel_selection = std::move(selected.record);
+        state.kernels_.push_back(std::move(selected.kernel));
         plan.nodes_.push_back(std::move(node_plan));
 
         if(producer_position.at(plan.nodes_.back().output) != lifetime_npos){
@@ -197,6 +231,16 @@ const ExecutionPlan& SessionState::execution_plan() const noexcept{
 
 const MemoryPlan& SessionState::memory_plan() const noexcept{
     return memory_plan_;
+}
+
+bool SessionState::requires_intra_op_thread_pool() const noexcept{
+    return std::any_of(
+        execution_plan_.nodes().begin(),
+        execution_plan_.nodes().end(),
+        [](const NodeExecutionPlan& node){
+            return node.kernel_selection.threading == KernelThreading::IntraOp;
+        }
+    );
 }
 
 std::string SessionState::dump_memory_plan() const{

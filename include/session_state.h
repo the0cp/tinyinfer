@@ -12,6 +12,7 @@ namespace tinyinfer{
 class KernelRegistry;
 class OpKernel;
 class OperatorRegistry;
+class ThreadingPlan;
 
 class SessionState{
 public:
@@ -28,9 +29,18 @@ public:
         MemoryPlanningPolicy memory_policy = MemoryPlanningPolicy::Disabled
     );
 
+    static SessionState build(
+        Graph graph,
+        const OperatorRegistry& operator_registry,
+        const KernelRegistry& kernel_registry,
+        MemoryPlanningPolicy memory_policy,
+        const ThreadingPlan& threading_plan
+    );
+
     const Graph& graph() const noexcept;
     const ExecutionPlan& execution_plan() const noexcept;
     const MemoryPlan& memory_plan() const noexcept;
+    bool requires_intra_op_thread_pool() const noexcept;
     std::string dump_memory_plan() const;
     const OpKernel& kernel(size_t index) const;
 

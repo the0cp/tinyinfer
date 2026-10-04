@@ -96,6 +96,19 @@ void ExecutionFrame::bind_input(ValueIndex index, const Tensor& tensor){
         );
     }
 
+    const ValueInfo& input_info = plan.value_info(index);
+    if(tensor.dtype() != input_info.dtype){
+        throw std::runtime_error(
+            "Input dtype mismatch for '" + std::string(plan.value_names().name(index)) + "'."
+        );
+    }
+    if(!tensor.is_contiguous()){
+        throw std::runtime_error(
+            "Input layout mismatch for '" + std::string(plan.value_names().name(index)) +
+            "': compiled kernels require contiguous input."
+        );
+    }
+
     ValueSlot& slot = values_.at(index);
 
     if(slot.has_value()){

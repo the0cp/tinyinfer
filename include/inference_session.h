@@ -8,6 +8,7 @@
 #include "session_options.h"
 #include "session_state.h"
 #include "thread_pool.h"
+#include "threading_policy.h"
 
 #include <memory>
 #include <optional>
@@ -45,10 +46,12 @@ public:
 
     SessionLifecycle lifecycle() const noexcept;
     PassManager& pass_manager();
+    KernelRegistry& kernel_registry();
 
     const Graph& graph() const;
     const ExecutionPlan& plan() const;
     const SessionState& session_state() const;
+    const ThreadingPlan& threading_plan() const;
     const ModelMetadata& metadata() const;
 
 private:
@@ -69,7 +72,8 @@ private:
     std::optional<ModelMetadata> metadata_;
 
     std::unique_ptr<SessionState> session_state_;
-    std::unique_ptr<ThreadPool> inter_op_thread_pool_;
+    std::optional<ThreadingPlan> threading_plan_;
+    std::unique_ptr<ThreadPool> worker_pool_;
 };
 
 }
