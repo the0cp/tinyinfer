@@ -34,6 +34,8 @@ find_package(Threads REQUIRED)
 add_library(tinyinfer
     src/buffer.cpp
     src/tensor.cpp
+    src/kv_cache.cpp
+    src/attention.cpp
     src/ops.cpp
     src/thread_pool.cpp
     src/threading_policy.cpp
@@ -83,6 +85,9 @@ target_link_libraries(test_threading_policy PRIVATE tinyinfer)
 add_executable(test_kernel_selection tests/test_kernel_selection.cpp)
 target_link_libraries(test_kernel_selection PRIVATE tinyinfer)
 
+add_executable(test_attention tests/test_attention.cpp)
+target_link_libraries(test_attention PRIVATE tinyinfer)
+
 enable_testing()
 add_test(NAME test_ops COMMAND test_ops)
 add_test(NAME test_runtime COMMAND test_runtime)
@@ -90,6 +95,7 @@ add_test(NAME test_tensor_storage COMMAND test_tensor_storage)
 add_test(NAME test_memory_plan COMMAND test_memory_plan)
 add_test(NAME test_threading_policy COMMAND test_threading_policy)
 add_test(NAME test_kernel_selection COMMAND test_kernel_selection)
+add_test(NAME test_attention COMMAND test_attention)
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)
@@ -129,3 +135,6 @@ target_link_libraries(bench_memory_plan PRIVATE tinyinfer)
 
 add_executable(bench_kernel_selection benchmark/bench_kernel_selection.cpp)
 target_link_libraries(bench_kernel_selection PRIVATE tinyinfer)
+
+add_executable(bench_kv_cache benchmark/bench_kv_cache.cpp)
+target_link_libraries(bench_kv_cache PRIVATE tinyinfer)
