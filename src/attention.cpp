@@ -95,7 +95,8 @@ void compute_head_attention(
     }
 }
 
-void validate_cache_append(const ContiguousKvCache& cache, const AttentionShape& shape){
+template<typename Cache>
+void validate_cache_append(const Cache& cache, const AttentionShape& shape){
     if(cache.num_heads() != shape.heads || cache.head_dim() != shape.head_dim){
         throw std::invalid_argument("Attention shape does not match the KV cache configuration.");
     }
@@ -147,22 +148,12 @@ Tensor compute_causal_attention(
     return output;
 }
 
-}
-
-Tensor causal_attention_reference(
-    const Tensor& queries,
-    const Tensor& keys,
-    const Tensor& values
-){
-    const AttentionShape shape = validate_qkv(queries, keys, values);
-    return compute_causal_attention(queries, keys, values, shape);
-}
-
-Tensor attention_prefill(
+template<typename Cache>
+Tensor prefill_impl(
     const Tensor& queries,
     const Tensor& keys,
     const Tensor& values,
-    ContiguousKvCache& cache
+    Cache& cache
 ){
     const AttentionShape shape = validate_qkv(queries, keys, values);
     if(cache.size_tokens() != 0){
@@ -175,11 +166,12 @@ Tensor attention_prefill(
     return output;
 }
 
-Tensor attention_decode(
+template<typename Cache>
+Tensor decode_impl(
     const Tensor& query,
     const Tensor& key,
     const Tensor& value,
-    ContiguousKvCache& cache
+    Cache& cache
 ){
     const AttentionShape shape = validate_qkv(query, key, value);
     if(shape.tokens != 1){
@@ -205,6 +197,53 @@ Tensor attention_decode(
     }
 
     return output;
+}
+
+}
+
+Tensor causal_attention_reference(
+    const Tensor& queries,
+    const Tensor& keys,
+    const Tensor& values
+){
+    const AttentionShape shape = validate_qkv(queries, keys, values);
+    return compute_causal_attention(queries, keys, values, shape);
+}
+
+Tensor attention_prefill(
+    const Tensor& queries,
+    const Tensor& keys,
+    const Tensor& values,
+    ContiguousKvCache& cache
+){
+    return prefill_impl(queries, keys, values, cache);
+}
+
+Tensor attention_decode(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    ContiguousKvCache& cache
+){
+    return decode_impl(query, key, value, cache);
+}
+
+Tensor attention_prefill(
+    const Tensor& queries,
+    const Tensor& keys,
+    const Tensor& values,
+    PagedKvCache& cache
+){
+    return prefill_impl(queries, keys, values, cache);
+}
+
+Tensor attention_decode(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    PagedKvCache& cache
+){
+    return decode_impl(query, key, value, cache);
 }
 
 }

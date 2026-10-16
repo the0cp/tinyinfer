@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kv_cache.h"
+#include "paged_kv_cache.h"
 #include "tensor.h"
 
 namespace tinyinfer{
@@ -23,6 +24,20 @@ Tensor attention_decode(
     const Tensor& key,
     const Tensor& value,
     ContiguousKvCache& cache
+);
+
+Tensor attention_prefill(
+    const Tensor& queries,
+    const Tensor& keys,
+    const Tensor& values,
+    PagedKvCache& cache
+);
+
+Tensor attention_decode(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    PagedKvCache& cache
 );
 
 }
