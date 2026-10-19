@@ -81,6 +81,8 @@ void test_pool_configuration_and_lifetime(){
     expect(pool.free_blocks() == 3, "all blocks initially free");
     expect(pool.capacity_tokens() == 6, "pool token capacity");
     expect(pool.block_bytes() == 2 * 2 * 2 * 2 * sizeof(float), "block bytes");
+    expect(pool.used_blocks() == 0, "no blocks initially used");
+    expect(pool.used_bytes() == 0, "no bytes initially used");
     expect(pool.allocated_bytes() == 3 * pool.block_bytes(), "pool bytes");
 
     {
@@ -88,8 +90,11 @@ void test_pool_configuration_and_lifetime(){
         Tensor token = range_tensor(1, 2, 2, 1.0f);
         cache.append(token, token);
         expect(pool.free_blocks() == 2, "cache acquired one block");
+        expect(pool.used_blocks() == 1, "one physical block used");
+        expect(pool.used_bytes() == pool.block_bytes(), "one physical block of bytes used");
     }
     expect(pool.free_blocks() == 3, "destructor returned the block");
+    expect(pool.used_bytes() == 0, "destructor released physical bytes");
 
     expect_throw([&](){ PagedKvCache(pool, 0); }, "max_tokens");
     expect_throw([&](){ PagedKvCache(pool, 7); }, "pool capacity");
@@ -106,7 +111,7 @@ void test_append_across_block_boundaries(){
     expect(cache.used_blocks() == 3, "five tokens need three two-token blocks");
     expect(cache.block_table().size() == 3, "three logical block mappings");
     expect(cache.used_bytes() == 2 * 5 * 2 * 2 * sizeof(float), "logical bytes");
-    expect(cache.allocated_bytes() == 3 * pool.block_bytes(), "reserved block bytes");
+    expect(cache.mapped_bytes() == 3 * pool.block_bytes(), "mapped block bytes");
 
     for(size_t token = 0; token < 5; token++){
         for(size_t head = 0; head < 2; head++){
@@ -117,6 +122,104 @@ void test_append_across_block_boundaries(){
             }
         }
     }
+}
+
+void test_full_block_prefix_sharing(){
+    KvBlockPool pool({4, 2, 1, 1});
+    PagedKvCache source(pool, 6);
+    Tensor source_keys = range_tensor(5, 1, 1, 10.0f);
+    Tensor source_values = range_tensor(5, 1, 1, 20.0f);
+    source.append(source_keys, source_values);
+
+    PagedKvCache target(pool, 6);
+    target.share_prefix_from(source, 4);
+
+    expect(target.size_tokens() == 4, "target received four prefix tokens");
+    expect(target.block_table()[0] == source.block_table()[0], "first block shared");
+    expect(target.block_table()[1] == source.block_table()[1], "second block shared");
+    expect(pool.used_blocks() == 3, "sharing allocates no physical block");
+    expect(pool.block_ref_count(source.block_table()[0]) == 2, "first block retained");
+    expect(pool.block_ref_count(source.block_table()[1]) == 2, "second block retained");
+
+    for(size_t token = 0; token < 4; token++){
+        expect_close(target.key(token, 0)[0], source_keys.data()[token]);
+        expect_close(target.value(token, 0)[0], source_values.data()[token]);
+    }
+
+    Tensor target_key = range_tensor(1, 1, 1, 100.0f);
+    Tensor target_value = range_tensor(1, 1, 1, 200.0f);
+    target.append(target_key, target_value);
+    expect(pool.used_blocks() == 4, "target tail uses a private block");
+    expect(target.block_table()[2] != source.block_table()[2], "partial tails are private");
+    expect(
+        source.mapped_bytes() + target.mapped_bytes() == 6 * pool.block_bytes(),
+        "each cache counts its shared mappings"
+    );
+    expect(pool.used_bytes() == 4 * pool.block_bytes(), "pool counts unique physical blocks");
+    expect_close(source.key(4, 0)[0], source_keys.data()[4]);
+    expect_close(target.key(4, 0)[0], target_key.data()[0]);
+
+    source.clear();
+    expect(pool.used_blocks() == 3, "only the source-private tail was released");
+    expect_close(target.key(0, 0)[0], source_keys.data()[0]);
+
+    target.clear();
+    expect(pool.free_blocks() == pool.num_blocks(), "last owner returned every block");
+}
+
+void test_prefix_sharing_validation(){
+    KvBlockPool pool({4, 2, 1, 1});
+    KvBlockPool other_pool({4, 2, 1, 1});
+    PagedKvCache source(pool, 6);
+    source.append(range_tensor(4, 1, 1, 1.0f), range_tensor(4, 1, 1, 11.0f));
+
+    PagedKvCache target(pool, 6);
+    expect_throw([&](){ target.share_prefix_from(target, 2); }, "itself");
+    expect_throw([&](){ target.share_prefix_from(source, 0); }, "complete blocks");
+    expect_throw([&](){ target.share_prefix_from(source, 3); }, "complete blocks");
+    expect_throw([&](){ target.share_prefix_from(source, 6); }, "source cache");
+    expect(target.size_tokens() == 0, "failed sharing leaves target empty");
+    expect(pool.block_ref_count(source.block_table()[0]) == 1, "failed sharing retains nothing");
+
+    PagedKvCache other(other_pool, 6);
+    expect_throw([&](){ other.share_prefix_from(source, 2); }, "same block pool");
+
+    PagedKvCache small(pool, 2);
+    expect_throw([&](){ small.share_prefix_from(source, 4); }, "target cache");
+
+    Tensor one = range_tensor(1, 1, 1, 21.0f);
+    target.append(one, one);
+    expect_throw([&](){ target.share_prefix_from(source, 2); }, "must be empty");
+    expect_throw([&](){ (void)pool.block_ref_count(pool.num_blocks()); }, "block index");
+}
+
+void test_shared_prefix_decode_matches_reference(){
+    Tensor queries = range_tensor(5, 2, 2, 0.25f);
+    Tensor keys = range_tensor(5, 2, 2, 1.25f);
+    Tensor values = range_tensor(5, 2, 2, 2.25f);
+    const Tensor reference = causal_attention_reference(queries, keys, values);
+
+    KvBlockPool pool({3, 2, 2, 2});
+    PagedKvCache source(pool, 5);
+    (void)attention_prefill(
+        token_view(queries, 0, 4),
+        token_view(keys, 0, 4),
+        token_view(values, 0, 4),
+        source
+    );
+
+    PagedKvCache target(pool, 5);
+    target.share_prefix_from(source, 4);
+    const Tensor decoded = attention_decode(
+        token_view(queries, 4, 1),
+        token_view(keys, 4, 1),
+        token_view(values, 4, 1),
+        target
+    );
+
+    expect_tensor_close(decoded, token_view(reference, 4, 1));
+    expect(source.size_tokens() == 4, "target decode does not change source");
+    expect(target.size_tokens() == 5, "target owns the decoded token");
 }
 
 void test_fragmented_block_mapping(){
@@ -246,6 +349,9 @@ int main(){
     test_append_across_block_boundaries();
     test_fragmented_block_mapping();
     test_exhaustion_and_capacity_are_transactional();
+    test_full_block_prefix_sharing();
+    test_prefix_sharing_validation();
+    test_shared_prefix_decode_matches_reference();
     test_paged_attention_matches_reference();
     test_attention_across_block_sizes();
     test_access_validation();

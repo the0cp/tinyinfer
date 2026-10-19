@@ -30,17 +30,21 @@ public:
 
     size_t num_blocks() const noexcept;
     size_t free_blocks() const noexcept;
+    size_t used_blocks() const noexcept;
     size_t block_tokens() const noexcept;
     size_t num_heads() const noexcept;
     size_t head_dim() const noexcept;
     size_t capacity_tokens() const noexcept;
     size_t block_bytes() const noexcept;
+    size_t used_bytes() const noexcept;
     size_t allocated_bytes() const noexcept;
+    size_t block_ref_count(KvBlockId block) const;
 
 private:
     friend class PagedKvCache;
 
     KvBlockId acquire();
+    void retain(KvBlockId block) noexcept;
     void release(KvBlockId block) noexcept;
 
     std::span<float> key_token(KvBlockId block, size_t block_offset);
@@ -68,6 +72,7 @@ private:
     Tensor keys_;
     Tensor values_;
     std::vector<KvBlockId> free_blocks_;
+    std::vector<size_t> ref_counts_;
 };
 
 class PagedKvCache{
@@ -81,6 +86,7 @@ public:
     PagedKvCache& operator=(PagedKvCache&&) = delete;
 
     void append(const Tensor& keys, const Tensor& values);
+    void share_prefix_from(const PagedKvCache& source, size_t tokens);
     void clear() noexcept;
 
     size_t size_tokens() const noexcept;
@@ -89,7 +95,7 @@ public:
     size_t head_dim() const noexcept;
     size_t used_blocks() const noexcept;
     size_t used_bytes() const noexcept;
-    size_t allocated_bytes() const noexcept;
+    size_t mapped_bytes() const noexcept;
     std::span<const KvBlockId> block_table() const noexcept;
 
     std::span<const float> key(size_t token, size_t head) const;

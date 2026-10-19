@@ -1,5 +1,6 @@
 #include "paged_kv_cache.h"
 
+#include <cassert>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -66,7 +67,8 @@ KvBlockPool::KvBlockPool(KvBlockPoolConfig config)
           config_.block_tokens,
           config_.num_heads,
           config_.head_dim
-      }){
+      }),
+      ref_counts_(config_.num_blocks, 0){
     free_blocks_.reserve(config_.num_blocks);
     for(size_t block = config_.num_blocks; block-- > 0;){
         free_blocks_.push_back(block);
@@ -79,6 +81,10 @@ size_t KvBlockPool::num_blocks() const noexcept{
 
 size_t KvBlockPool::free_blocks() const noexcept{
     return free_blocks_.size();
+}
+
+size_t KvBlockPool::used_blocks() const noexcept{
+    return num_blocks() - free_blocks();
 }
 
 size_t KvBlockPool::block_tokens() const noexcept{
@@ -101,8 +107,19 @@ size_t KvBlockPool::block_bytes() const noexcept{
     return 2 * config_.block_tokens * config_.num_heads * config_.head_dim * sizeof(float);
 }
 
+size_t KvBlockPool::used_bytes() const noexcept{
+    return used_blocks() * block_bytes();
+}
+
 size_t KvBlockPool::allocated_bytes() const noexcept{
     return keys_.size_bytes() + values_.size_bytes();
+}
+
+size_t KvBlockPool::block_ref_count(KvBlockId block) const{
+    if(block >= num_blocks()){
+        throw std::out_of_range("KV block index is out of range.");
+    }
+    return ref_counts_[block];
 }
 
 KvBlockId KvBlockPool::acquire(){
@@ -112,11 +129,24 @@ KvBlockId KvBlockPool::acquire(){
 
     const KvBlockId block = free_blocks_.back();
     free_blocks_.pop_back();
+    assert(ref_counts_[block] == 0);
+    ref_counts_[block] = 1;
     return block;
 }
 
+void KvBlockPool::retain(KvBlockId block) noexcept{
+    assert(block < num_blocks());
+    assert(ref_counts_[block] > 0);
+    ref_counts_[block]++;
+}
+
 void KvBlockPool::release(KvBlockId block) noexcept{
-    free_blocks_.push_back(block);
+    assert(block < num_blocks());
+    assert(ref_counts_[block] > 0);
+    ref_counts_[block]--;
+    if(ref_counts_[block] == 0){
+        free_blocks_.push_back(block);
+    }
 }
 
 std::span<float> KvBlockPool::key_token(KvBlockId block, size_t block_offset){
@@ -221,6 +251,35 @@ void PagedKvCache::append(const Tensor& keys, const Tensor& values){
     size_tokens_ = final_tokens;
 }
 
+void PagedKvCache::share_prefix_from(const PagedKvCache& source, size_t tokens){
+    if(this == &source){
+        throw std::invalid_argument("Paged KV cache cannot share a prefix from itself.");
+    }
+    if(&pool_ != &source.pool_){
+        throw std::invalid_argument("Paged KV caches must use the same block pool.");
+    }
+    if(size_tokens_ != 0){
+        throw std::logic_error("Paged KV cache must be empty before sharing a prefix.");
+    }
+    if(tokens == 0 || tokens % pool_.block_tokens() != 0){
+        throw std::invalid_argument("Shared KV prefix must contain complete blocks.");
+    }
+    if(tokens > source.size_tokens_){
+        throw std::length_error("Shared KV prefix exceeds the source cache size.");
+    }
+    if(tokens > max_tokens_){
+        throw std::length_error("Shared KV prefix exceeds the target cache capacity.");
+    }
+
+    const size_t block_count = tokens / pool_.block_tokens();
+    for(size_t i = 0; i < block_count; i++){
+        const KvBlockId block = source.blocks_[i];
+        pool_.retain(block);
+        blocks_.push_back(block);
+    }
+    size_tokens_ = tokens;
+}
+
 void PagedKvCache::clear() noexcept{
     for(KvBlockId block : blocks_){
         pool_.release(block);
@@ -253,7 +312,7 @@ size_t PagedKvCache::used_bytes() const noexcept{
     return 2 * size_tokens_ * num_heads() * head_dim() * sizeof(float);
 }
 
-size_t PagedKvCache::allocated_bytes() const noexcept{
+size_t PagedKvCache::mapped_bytes() const noexcept{
     return blocks_.size() * pool_.block_bytes();
 }
 
