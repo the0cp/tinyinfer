@@ -50,13 +50,21 @@
 
 ## 5. Cache-backed causal Attention
 
-`benchmark/bench_kv_cache.cpp`; four heads, head dimension 16, eight prompt tokens; compares full causal recomputation at each step with prefill once + contiguous KV cache for decode. Both paths compute the same output checksum.
+`benchmark/bench_kv_cache.cpp`; eight Query heads, head dimension 16, eight prompt tokens; compares full causal recomputation at each step with prefill once + contiguous KV cache for decode. The benchmark varies KV heads across MHA, GQA, and MQA. `cache_bytes` is calculated from Tensor shape, not measured RSS. `checksum_delta` is an auxiliary aggregate check; unit tests provide the element-wise comparisons.
 
-| Total tokens | Full recomputation (median) | KV cached (median) | Program-reported median speedup |
-| -----------: | --------------------------: | -----------------: | ------------------------------: |
-|           32 |                  1,660.0 μs |           135.9 μs |                           12.2× |
-|           64 |                 12,201.9 μs |           542.7 μs |                           21.8× |
-|           96 |                 39,049.7 μs |         1,289.2 μs |                           30.0× |
+| Tokens | Mode | Full recomputation | KV cached | Speedup | Cache bytes | Saving vs MHA |
+|---:|---|---:|---:|---:|---:|---:|
+| 32 | 8Q/8KV | 2,865.3 μs | 276.6 μs | 10.4× | 32,768 | 0% |
+| 32 | 8Q/2KV | 2,727.3 μs | 322.2 μs | 8.5× | 8,192 | 75% |
+| 32 | 8Q/1KV | 2,902.6 μs | 288.7 μs | 10.1× | 4,096 | 87.5% |
+| 64 | 8Q/8KV | 22,433.8 μs | 1,126.9 μs | 19.9× | 65,536 | 0% |
+| 64 | 8Q/2KV | 23,104.1 μs | 1,101.5 μs | 21.0× | 16,384 | 75% |
+| 64 | 8Q/1KV | 22,239.8 μs | 1,088.4 μs | 20.4× | 8,192 | 87.5% |
+| 96 | 8Q/8KV | 76,570.4 μs | 2,572.3 μs | 29.8× | 98,304 | 0% |
+| 96 | 8Q/2KV | 73,550.0 μs | 2,472.1 μs | 29.8× | 24,576 | 75% |
+| 96 | 8Q/1KV | 74,110.8 μs | 2,311.2 μs | 32.1× | 12,288 | 87.5% |
+
+This is a three-sample median without a dedicated warm-up. It is useful as a local component snapshot, not as the final real-model performance methodology.
 
 
 ## 6. Paged KV utilization and shared prefixes

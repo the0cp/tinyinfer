@@ -1,10 +1,15 @@
 # tinyinfer
 
-**A lightweight CPU inference runtime implemented in C++20.**
+**A lightweight C++20 CPU inference runtime for graph and generative workloads.**
 
-tinyinfer implements the core components of neural-network inference, from tensor storage and operator kernels to graph compilation, memory planning, parallel execution, and KV-cache management. The project focuses on explicit implementation choices, correctness tests, and reproducible performance experiments.
+tinyinfer is one small inference engine with two execution scenarios:
 
-It currently supports a small set of float32 operators and CPU execution. The Attention and KV-cache components are reference implementations rather than a complete LLM serving system.
+- **Graph inference** compiles a static graph into an execution and memory plan.
+- **Generative inference** will run a stateful Transformer decoder with prefill, decode, and KV caching.
+
+Both paths share the same Tensor/Buffer representation, CPU primitives, threading foundation, and measurement conventions. The decoder is not required to masquerade as a static graph: stateful generation may use a direct loop when that is clearer.
+
+The current repository has a working minimal Graph Runtime and standalone reference Attention/KV-cache components. It does **not** yet have a Transformer decoder, tokenizer, real pretrained-model loader, text-generation loop, or unified `run`/`generate` CLI.
 
 ## Features
 
@@ -16,7 +21,7 @@ It currently supports a small set of float32 operators and CPU execution. The At
 | **Memory planning**           | Tensor lifetime analysis and reusable activation buffers in sequential mode; dedicated buffers for parallel execution and a private arena per run. |
 | **Kernel selection**          | Session-initialization-time selection of serial or threaded CPU kernels using shape-aware cost estimates. |
 | **Model loading & profiling** | Native manifest/binary-weight format, per-node timing, allocation tracking, and Chrome trace export. |
-| **Attention & KV cache**      | CPU causal Attention, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
+| **Attention & KV cache**      | CPU causal MHA/GQA/MQA, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
 
 The execution pipeline is:
 
@@ -25,7 +30,19 @@ Graph → validation / optimization → ExecutionPlan + MemoryPlan
       → ExecutionFrame → selected kernels → output Tensor
 ```
 
-Paged KV cache is a separate reference component: request-local block tables map logical token positions to fixed-size physical blocks in a shared pool. `share_prefix_from()` reuses complete prefix blocks without copying K/V; per-block reference counts control reclamation. Prefix compatibility must be established by the caller.
+Attention and KV caches currently sit beside this pipeline rather than inside a complete model executor. Paged KV cache maps logical token positions to fixed-size physical blocks; `share_prefix_from()` reuses complete prefix blocks without copying K/V. Prefix compatibility must be established by the caller.
+
+The intended end state is deliberately small:
+
+```text
+tinyinfer CLI
+  ├── run      → InferenceSession → ExecutionPlan
+  └── generate → TransformerDecoder → prefill/decode state
+                         │
+        shared Tensor / Buffer / CPU ops / ThreadPool
+```
+
+The next priority is a numerically verified, end-to-end pretrained Transformer path—not more cache policies, graph abstractions, or backend interfaces.
 
 ## Build and test
 
@@ -55,14 +72,15 @@ ctest --test-dir build-asan --output-on-failure
 | MatMul, 512 × 512                       |     Serial `fast_matmul`: 13 ms |           8-thread MatMul: 6 ms | **2.2× faster**          |
 | Memory planning, 12 ReLU nodes          |                    9.921 µs/run |                    6.092 µs/run | **38.6% lower latency**  |
 | Managed buffer allocations, same graph  |                              12 |                               3 | **75% fewer**            |
-| Cached Attention, 96 tokens             | Full recomputation: 39,049.7 µs | Contiguous KV cache: 1,289.2 µs | **30.0× faster**         |
+| Cached Attention, 96 tokens, 8Q/8KV     | Full recomputation: 76,570.4 µs | Contiguous KV cache: 2,572.3 µs | **29.8× faster**         |
 | Kernel selection, `[8,512] × [512,512]` |              Serial: 200.117 µs |            Threaded: 131.221 µs | **1.53× faster**         |
 | Full-block prefix sharing               |           20 occupied KV blocks |            8 occupied KV blocks | **60% fewer blocks**     |
 | Small branching graph, 1,000 runs       |             Sequential: 12.1 ms |              Parallel: 170.3 ms | **Parallel ~14× slower** |
 
 Performance depends on workload size. Parallel scheduling is counterproductive for tiny graph nodes, while kernel-level parallelism benefits sufficiently large matrix operations. With four tokens per block, the paged-cache benchmark achieves **94.7% mapped-slot utilization** on its five-request workload.
 
-The **60%** prefix-sharing result measures unique occupied KV blocks, not process RSS; the block pool preallocates backing memory. The cached-Attention speedup compares incremental decoding against repeated full recomputation, not paged against contiguous KV storage. See [benchmark results](benchmark/RESULTS.md) for configurations, raw measurement definitions, and limitations.
+The **60%** prefix-sharing result measures unique occupied KV blocks, not process RSS; the block pool preallocates backing memory. The cached-Attention speedup compares incremental decoding against repeated full recomputation, not paged against contiguous KV storage. See [benchmark results](benchmark/RESULT.md) for configurations, raw measurement definitions, and limitations.
+
 
 To run every benchmark:
 
