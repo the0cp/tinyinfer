@@ -194,7 +194,7 @@ void test_prefix_sharing_validation(){
 }
 
 void test_shared_prefix_decode_matches_reference(){
-    Tensor queries = range_tensor(5, 2, 2, 0.25f);
+    Tensor queries = range_tensor(5, 4, 2, 0.25f);
     Tensor keys = range_tensor(5, 2, 2, 1.25f);
     Tensor values = range_tensor(5, 2, 2, 2.25f);
     const Tensor reference = causal_attention_reference(queries, keys, values);

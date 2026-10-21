@@ -64,6 +64,14 @@ void expect_tensor_close(const Tensor& actual, const Tensor& expected){
     }
 }
 
+Tensor range_tensor(size_t tokens, size_t heads, size_t head_dim, float first){
+    Tensor tensor({tokens, heads, head_dim});
+    for(size_t i = 0; i < tensor.numel(); i++){
+        tensor.data()[i] = first + static_cast<float>(i) * 0.1f;
+    }
+    return tensor;
+}
+
 void test_cache_append_and_clear(){
     ContiguousKvCache cache({3, 2, 2});
     Tensor keys({2, 2, 2}, {1, 2, 3, 4, 5, 6, 7, 8});
@@ -116,6 +124,98 @@ void test_reference_attention_known_values(){
     const float denominator = first_weight + 1.0f;
     expect_close(output.data()[2], 2.0f * first_weight / denominator);
     expect_close(output.data()[3], 4.0f / denominator);
+}
+
+void test_grouped_query_head_mapping(){
+    Tensor queries({1, 4, 2}, {1, 0, 0, 1, 1, 1, 2, 1});
+    Tensor keys({1, 2, 2}, {1, 0, 0, 1});
+    Tensor values({1, 2, 2}, {10, 11, 20, 21});
+
+    const Tensor output = causal_attention_reference(queries, keys, values);
+    const std::vector<float> expected{10, 11, 10, 11, 20, 21, 20, 21};
+    for(size_t i = 0; i < expected.size(); i++){
+        expect_close(output.data()[i], expected[i]);
+    }
+}
+
+void test_mha_gqa_and_mqa_prefill_decode(){
+    constexpr size_t tokens = 4;
+    constexpr size_t query_heads = 4;
+    constexpr size_t head_dim = 2;
+    const Tensor queries = range_tensor(tokens, query_heads, head_dim, 0.25f);
+
+    for(size_t kv_heads : {4U, 2U, 1U}){
+        const Tensor keys = range_tensor(tokens, kv_heads, head_dim, 1.25f);
+        const Tensor values = range_tensor(tokens, kv_heads, head_dim, 2.25f);
+        const Tensor reference = causal_attention_reference(queries, keys, values);
+
+        ContiguousKvCache cache({tokens, kv_heads, head_dim});
+        const Tensor prefill = attention_prefill(
+            token_view(queries, 0, 3),
+            token_view(keys, 0, 3),
+            token_view(values, 0, 3),
+            cache
+        );
+        expect_tensor_close(prefill, token_view(reference, 0, 3));
+
+        const Tensor decoded = attention_decode(
+            token_view(queries, 3, 1),
+            token_view(keys, 3, 1),
+            token_view(values, 3, 1),
+            cache
+        );
+        expect_tensor_close(decoded, token_view(reference, 3, 1));
+        expect(cache.num_heads() == kv_heads, "cache stores only KV heads");
+    }
+}
+
+void test_grouped_query_validation(){
+    expect_throw(
+        [](){
+            (void)causal_attention_reference(
+                Tensor({1, 3, 2}), Tensor({1, 2, 2}), Tensor({1, 2, 2})
+            );
+        },
+        "divisible"
+    );
+    expect_throw(
+        [](){
+            (void)causal_attention_reference(
+                Tensor({2, 4, 2}), Tensor({1, 2, 2}), Tensor({1, 2, 2})
+            );
+        },
+        "token counts"
+    );
+    expect_throw(
+        [](){
+            (void)causal_attention_reference(
+                Tensor({1, 4, 3}), Tensor({1, 2, 2}), Tensor({1, 2, 2})
+            );
+        },
+        "head dimensions"
+    );
+    expect_throw(
+        [](){
+            (void)causal_attention_reference(
+                Tensor({1, 4, 2}), Tensor({1, 2, 2}), Tensor({1, 1, 2})
+            );
+        },
+        "K and V"
+    );
+
+    ContiguousKvCache wrong_cache({2, 1, 2});
+    expect_throw(
+        [&](){
+            (void)attention_decode(
+                Tensor({1, 4, 2}),
+                Tensor({1, 2, 2}),
+                Tensor({1, 2, 2}),
+                wrong_cache
+            );
+        },
+        "does not match"
+    );
+    expect(wrong_cache.size_tokens() == 0, "cache mismatch appends no KV token");
 }
 
 void test_prefill_and_decode_match_full_recomputation(){
@@ -197,6 +297,9 @@ int main(){
     test_cache_append_and_clear();
     test_cache_validation_and_transactional_overflow();
     test_reference_attention_known_values();
+    test_grouped_query_head_mapping();
+    test_mha_gqa_and_mqa_prefill_decode();
+    test_grouped_query_validation();
     test_prefill_and_decode_match_full_recomputation();
     test_attention_phase_contracts();
     std::cout << "attention tests passed\n";

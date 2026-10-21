@@ -74,7 +74,7 @@ float run_cached(
     const Tensor& values,
     size_t prompt_tokens
 ){
-    ContiguousKvCache cache({queries.shape()[0], queries.shape()[1], queries.shape()[2]});
+    ContiguousKvCache cache({keys.shape()[0], keys.shape()[1], keys.shape()[2]});
     Tensor output = attention_prefill(
         token_view(queries, 0, prompt_tokens),
         token_view(keys, 0, prompt_tokens),
@@ -96,15 +96,15 @@ float run_cached(
     return checksum;
 }
 
-void run_case(size_t total_tokens){
-    constexpr size_t heads = 4;
+void run_case(size_t total_tokens, size_t kv_heads){
+    constexpr size_t query_heads = 8;
     constexpr size_t head_dim = 16;
     constexpr size_t prompt_tokens = 8;
     constexpr size_t repeats = 3;
 
-    const Tensor queries = make_tensor(total_tokens, heads, head_dim, 0.1f);
-    const Tensor keys = make_tensor(total_tokens, heads, head_dim, 0.2f);
-    const Tensor values = make_tensor(total_tokens, heads, head_dim, 0.3f);
+    const Tensor queries = make_tensor(total_tokens, query_heads, head_dim, 0.1f);
+    const Tensor keys = make_tensor(total_tokens, kv_heads, head_dim, 0.2f);
+    const Tensor values = make_tensor(total_tokens, kv_heads, head_dim, 0.3f);
 
     float reference_checksum = 0.0f;
     const double reference_us = median_microseconds(
@@ -120,20 +120,26 @@ void run_case(size_t total_tokens){
         cached_checksum
     );
 
-    const size_t cache_bytes = 2 * total_tokens * heads * head_dim * sizeof(float);
+    const size_t cache_bytes = 2 * total_tokens * kv_heads * head_dim * sizeof(float);
+    const double saving = 1.0 - static_cast<double>(kv_heads) / query_heads;
     std::cout << total_tokens << ',' << prompt_tokens << ','
+              << query_heads << ',' << kv_heads << ',' << query_heads / kv_heads << ','
               << std::fixed << std::setprecision(1)
               << reference_us << ',' << cached_us << ','
               << reference_us / cached_us << ',' << cache_bytes << ','
+              << std::setprecision(3) << saving << ','
               << std::fabs(reference_checksum - cached_checksum) << '\n';
 }
 
 }
 
 int main(){
-    std::cout << "tokens,prompt_tokens,full_recompute_us,kv_cached_us,speedup,cache_bytes,checksum_delta\n";
+    std::cout << "tokens,prompt_tokens,query_heads,kv_heads,group_size,full_recompute_us,"
+                 "kv_cached_us,speedup,cache_bytes,cache_saving_vs_mha,checksum_delta\n";
     for(size_t tokens : {32U, 64U, 96U}){
-        run_case(tokens);
+        for(size_t kv_heads : {8U, 2U, 1U}){
+            run_case(tokens, kv_heads);
+        }
     }
     return 0;
 }
