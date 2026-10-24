@@ -5,6 +5,7 @@ project(tinyinfer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(TINYINFER_ENABLE_ASAN_UBSAN "Build tinyinfer with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(TINYINFER_ENABLE_TSAN "Build tinyinfer with ThreadSanitizer" OFF)
@@ -37,6 +38,7 @@ add_library(tinyinfer
     src/kv_cache.cpp
     src/paged_kv_cache.cpp
     src/attention.cpp
+    src/decoder_block.cpp
     src/ops.cpp
     src/thread_pool.cpp
     src/threading_policy.cpp
@@ -92,6 +94,9 @@ target_link_libraries(test_attention PRIVATE tinyinfer)
 add_executable(test_paged_kv_cache tests/test_paged_kv_cache.cpp)
 target_link_libraries(test_paged_kv_cache PRIVATE tinyinfer)
 
+add_executable(test_decoder_block tests/test_decoder_block.cpp)
+target_link_libraries(test_decoder_block PRIVATE tinyinfer)
+
 enable_testing()
 add_test(NAME test_ops COMMAND test_ops)
 add_test(NAME test_runtime COMMAND test_runtime)
@@ -101,6 +106,7 @@ add_test(NAME test_threading_policy COMMAND test_threading_policy)
 add_test(NAME test_kernel_selection COMMAND test_kernel_selection)
 add_test(NAME test_attention COMMAND test_attention)
 add_test(NAME test_paged_kv_cache COMMAND test_paged_kv_cache)
+add_test(NAME test_decoder_block COMMAND test_decoder_block)
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)

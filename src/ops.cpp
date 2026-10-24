@@ -52,13 +52,13 @@ struct LinearDimensions{
 LinearDimensions prepare_linear(
     const Tensor& x,
     const Tensor& weight,
-    const Tensor& bias,
+    const Tensor* bias,
     Tensor& out
 ){
     if(x.dim() != 2 || weight.dim() != 2){
         throw std::runtime_error("linear expects 2D input and weight tensors.");
     }
-    if(bias.dim() != 1){
+    if(bias != nullptr && bias->dim() != 1){
         throw std::runtime_error("linear expects a 1D bias tensor.");
     }
 
@@ -66,21 +66,23 @@ LinearDimensions prepare_linear(
     if(weight.shape()[0] != dimensions.input_features){
         throw std::runtime_error("linear input and weight shapes do not match.");
     }
-    if(bias.shape()[0] != dimensions.output_features){
+    if(bias != nullptr && bias->shape()[0] != dimensions.output_features){
         throw std::runtime_error("linear weight and bias shapes do not match.");
     }
 
     require_output(out, Shape{dimensions.batch, dimensions.output_features}, "linear");
     require_disjoint_input(x, out, "linear");
     require_disjoint_input(weight, out, "linear");
-    require_disjoint_input(bias, out, "linear");
+    if(bias != nullptr){
+        require_disjoint_input(*bias, out, "linear");
+    }
     return dimensions;
 }
 
 void compute_linear_rows(
     const Tensor& x,
     const Tensor& weight,
-    const Tensor& bias,
+    const Tensor* bias,
     Tensor& out,
     const LinearDimensions& dimensions,
     size_t row_begin,
@@ -88,14 +90,14 @@ void compute_linear_rows(
 ){
     const float* x_data = x.data();
     const float* weight_data = weight.data();
-    const float* bias_data = bias.data();
+    const float* bias_data = bias == nullptr ? nullptr : bias->data();
     float* out_data = out.data();
 
     for(size_t row = row_begin; row < row_end; row++){
         float* out_row = out_data + row * dimensions.output_features;
 
         for(size_t column = 0; column < dimensions.output_features; column++){
-            out_row[column] = bias_data[column];
+            out_row[column] = bias_data == nullptr ? 0.0f : bias_data[column];
         }
 
         for(size_t inner = 0; inner < dimensions.input_features; inner++){
@@ -439,12 +441,65 @@ Tensor add_bias(const Tensor& x, const Tensor& bias){
     return out;
 }
 
+void embedding_out(
+    const Tensor& weight,
+    std::span<const int64_t> token_ids,
+    Tensor& out
+){
+    if(weight.dim() != 2){
+        throw std::runtime_error("embedding expects a 2D weight tensor.");
+    }
+    
+    const size_t vocabulary_size = weight.shape()[0];
+    const size_t hidden_size = weight.shape()[1];
+
+    if(vocabulary_size == 0 || hidden_size == 0){
+        throw std::runtime_error("embedding dimensions must be positive.");
+    }
+
+    for(int64_t token_id : token_ids){
+        if(token_id < 0 || static_cast<size_t>(token_id) >= vocabulary_size){
+            throw std::out_of_range("embedding token id is out of range.");
+        }
+    }
+
+    require_output(out, {token_ids.size(), hidden_size}, "embedding");
+    require_disjoint_input(weight, out, "embedding");
+
+    for(size_t token = 0; token < token_ids.size(); token++){
+        const size_t row = static_cast<size_t>(token_ids[token]);
+        std::copy_n(
+            weight.data() + row * hidden_size,
+            hidden_size,
+            out.data() + token * hidden_size
+        );
+    }
+}
+
+Tensor embedding(const Tensor& weight, std::span<const int64_t> token_ids){
+    if(weight.dim() != 2){
+        throw std::runtime_error("embedding expects a 2D weight tensor.");
+    }
+
+    Tensor out({token_ids.size(), weight.shape()[1]});
+    embedding_out(weight, token_ids, out);
+    return out;
+}
+
 void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out){
-    const LinearDimensions dimensions = prepare_linear(x, weight, bias, out);
+    const LinearDimensions dimensions = prepare_linear(x, weight, &bias, out);
     if(out.numel() == 0){
         return;
     }
-    compute_linear_rows(x, weight, bias, out, dimensions, 0, dimensions.batch);
+    compute_linear_rows(x, weight, &bias, out, dimensions, 0, dimensions.batch);
+}
+
+void linear_out(const Tensor& x, const Tensor& weight, Tensor& out){
+    const LinearDimensions dimensions = prepare_linear(x, weight, nullptr, out);
+    if(out.numel() == 0){
+        return;
+    }
+    compute_linear_rows(x, weight, nullptr, out, dimensions, 0, dimensions.batch);
 }
 
 void threadpool_linear_out(
@@ -455,7 +510,7 @@ void threadpool_linear_out(
     ThreadPool& pool,
     size_t num_tasks
 ){
-    const LinearDimensions dimensions = prepare_linear(x, weight, bias, out);
+    const LinearDimensions dimensions = prepare_linear(x, weight, &bias, out);
     if(out.numel() == 0){
         return;
     }
@@ -467,7 +522,7 @@ void threadpool_linear_out(
             compute_linear_rows(
                 x,
                 weight,
-                bias,
+                &bias,
                 out,
                 dimensions,
                 row_begin,
@@ -484,6 +539,16 @@ Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
 
     Tensor out({x.shape()[0], weight.shape()[1]});
     linear_out(x, weight, bias, out);
+    return out;
+}
+
+Tensor linear(const Tensor& x, const Tensor& weight){
+    if(x.dim() != 2 || weight.dim() != 2){
+        throw std::runtime_error("linear expects 2D input and weight tensors.");
+    }
+
+    Tensor out({x.shape()[0], weight.shape()[1]});
+    linear_out(x, weight, out);
     return out;
 }
 
@@ -530,6 +595,78 @@ Tensor softmax(const Tensor& x){
     Tensor out(x.shape());
     softmax_out(x, out);
 
+    return out;
+}
+
+void rms_norm_out(
+    const Tensor& x,
+    const Tensor& weight,
+    float epsilon,
+    Tensor& out
+){
+    if(x.dim() == 0 || weight.dim() != 1){
+        throw std::runtime_error("rms_norm expects a tensor and a 1D weight.");
+    }
+
+    const size_t features = x.shape().back();
+
+    if(features == 0 || weight.shape()[0] != features){
+        throw std::runtime_error("rms_norm weight shape mismatch.");
+    }
+
+    if(!std::isfinite(epsilon) || epsilon <= 0.0f){
+        throw std::runtime_error("rms_norm epsilon must be finite and positive.");
+    }
+
+    require_output(out, x.shape(), "rms_norm");
+    require_disjoint_input(x, out, "rms_norm");
+    require_disjoint_input(weight, out, "rms_norm");
+
+    const size_t rows = x.numel() / features;
+
+    for(size_t row = 0; row < rows; row++){
+        const float* source = x.data() + row * features;
+        float* destination = out.data() + row * features;
+        float square_sum = 0.0f;
+
+        for(size_t feature = 0; feature < features; feature++){
+            square_sum += source[feature] * source[feature];
+        }
+
+        const float scale = 1.0f / std::sqrt(
+            square_sum / static_cast<float>(features) + epsilon
+        );
+
+        for(size_t feature = 0; feature < features; feature++){
+            destination[feature] = source[feature] * scale * weight.data()[feature];
+        }
+    }
+}
+
+Tensor rms_norm(const Tensor& x, const Tensor& weight, float epsilon){
+    Tensor out(x.shape());
+    rms_norm_out(x, weight, epsilon, out);
+    return out;
+}
+
+void silu_mul_out(const Tensor& gate, const Tensor& up, Tensor& out){
+    if(gate.shape() != up.shape()){
+        throw std::runtime_error("silu_mul input shape mismatch.");
+    }
+
+    require_output(out, gate.shape(), "silu_mul");
+    require_disjoint_input(gate, out, "silu_mul");
+    require_disjoint_input(up, out, "silu_mul");
+
+    for(size_t i = 0; i < gate.numel(); i++){
+        const float value = gate.data()[i];
+        out.data()[i] = value / (1.0f + std::exp(-value)) * up.data()[i];
+    }
+}
+
+Tensor silu_mul(const Tensor& gate, const Tensor& up){
+    Tensor out(gate.shape());
+    silu_mul_out(gate, up, out);
     return out;
 }
 

@@ -3,6 +3,9 @@
 #include "tensor.h"
 #include "thread_pool.h"
 
+#include <cstdint>
+#include <span>
+
 namespace tinyinfer{
 
 // *_out contract: contiguous float32 inputs/output, exact output shape, and
@@ -21,6 +24,14 @@ Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt);
 Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_thread);
 Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, size_t num_tasks);
 Tensor add_bias(const Tensor& x, const Tensor& bias);
+Tensor embedding(const Tensor& weight, std::span<const int64_t> token_ids);
+void embedding_out(
+    const Tensor& weight,
+    std::span<const int64_t> token_ids,
+    Tensor& out
+);
+Tensor linear(const Tensor& x, const Tensor& weight);
+void linear_out(const Tensor& x, const Tensor& weight, Tensor& out);
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias);
 void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out);
 void threadpool_linear_out(
@@ -33,5 +44,9 @@ void threadpool_linear_out(
 );
 Tensor softmax(const Tensor& x);
 void softmax_out(const Tensor& x, Tensor& out);
+Tensor rms_norm(const Tensor& x, const Tensor& weight, float epsilon);
+void rms_norm_out(const Tensor& x, const Tensor& weight, float epsilon, Tensor& out);
+Tensor silu_mul(const Tensor& gate, const Tensor& up);
+void silu_mul_out(const Tensor& gate, const Tensor& up, Tensor& out);
 
 }
