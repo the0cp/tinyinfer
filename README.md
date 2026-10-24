@@ -9,7 +9,9 @@ tinyinfer is one small inference engine with two execution scenarios:
 
 Both paths share the same Tensor/Buffer representation, CPU primitives, threading foundation, and measurement conventions. The decoder is not required to masquerade as a static graph: stateful generation may use a direct loop when that is clearer.
 
-The current repository has a working minimal Graph Runtime and standalone reference Attention/KV-cache components. It does **not** yet have a Transformer decoder, tokenizer, real pretrained-model loader, text-generation loop, or unified `run`/`generate` CLI.
+The repository currently provides a working minimal graph runtime, CPU Attention and KV-cache implementations, and a standalone Qwen2-compatible causal Decoder Block.
+
+The Decoder Block implements biased Q/K/V projections, RMSNorm, half-split RoPE, Grouped-Query Attention (GQA), SwiGLU, and residual connections. It supports both prefill and cached single-token decode, with small synthetic tests validated against a Hugging Face Transformers reference implementation.
 
 ## Features
 
@@ -22,6 +24,7 @@ The current repository has a working minimal Graph Runtime and standalone refere
 | **Kernel selection**          | Session-initialization-time selection of serial or threaded CPU kernels using shape-aware cost estimates. |
 | **Model loading & profiling** | Native manifest/binary-weight format, per-node timing, allocation tracking, and Chrome trace export. |
 | **Attention & KV cache**      | CPU causal MHA/GQA/MQA, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
+| **Decoder Block** | Causal decoder block with RMSNorm, biased QKV, half-split RoPE, GQA, SwiGLU, residual connections, and prefill/decode support. |
 
 The execution pipeline is:
 
