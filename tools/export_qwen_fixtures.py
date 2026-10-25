@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import platform
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -352,6 +353,17 @@ def write_fixtures(
             )
             offset += len(payload)
 
+    input_ids = arrays["input_ids"].reshape(-1).astype("<i8", copy=False)
+    layer0_output = arrays["layer0_output"].astype("<f4", copy=False)
+    tokens, hidden = layer0_output.shape
+    if input_ids.size != tokens:
+        raise ValueError("layer0 case token count mismatch")
+    layer0_case_path = output_dir / "layer0_case.bin"
+    with layer0_case_path.open("wb") as stream:
+        stream.write(struct.pack("<8sIII", b"TILYR001", 1, tokens, hidden))
+        stream.write(input_ids.tobytes(order="C"))
+        stream.write(layer0_output.tobytes(order="C"))
+
     manifest = {
         "format": "tinyinfer_qwen_fixture",
         "version": 1,
@@ -383,6 +395,12 @@ def write_fixtures(
             "file": binary_path.name,
             "byte_size": offset,
             "sha256": sha256_file(binary_path),
+        },
+        "layer0_case": {
+            "file": layer0_case_path.name,
+            "tokens": tokens,
+            "hidden_size": hidden,
+            "sha256": sha256_file(layer0_case_path),
         },
         "arrays": entries,
     }

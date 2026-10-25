@@ -116,10 +116,6 @@ void Tensor::validate_layout() const{
         throw std::invalid_argument("Tensor shape and stride ranks must match.");
     }
 
-    if(dtype_ != DataType::Float32){
-        throw std::invalid_argument("Tensor currently supports only float32 data access.");
-    }
-
     const size_t alignment = element_alignment(dtype_);
 
     if(byte_offset_ % alignment != 0){
@@ -212,17 +208,29 @@ size_t Tensor::linear_offset(size_t linear_index) const{
     return element_offset;
 }
 
-float* Tensor::element_ptr(size_t element_offset){
+std::byte* Tensor::byte_ptr(size_t element_offset){
     auto* bytes = static_cast<std::byte*>(buffer_->data());
-    return reinterpret_cast<float*>(bytes + byte_offset_ + element_offset * element_size(dtype_));
+    return bytes + byte_offset_ + element_offset * element_size(dtype_);
+}
+
+const std::byte* Tensor::byte_ptr(size_t element_offset) const{
+    const Buffer& const_buffer = *buffer_;
+    const auto* bytes = static_cast<const std::byte*>(const_buffer.data());
+    return bytes + byte_offset_ + element_offset * element_size(dtype_);
+}
+
+float* Tensor::element_ptr(size_t element_offset){
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Float access requires a float32 tensor.");
+    }
+    return reinterpret_cast<float*>(byte_ptr(element_offset));
 }
 
 const float* Tensor::element_ptr(size_t element_offset) const{
-    const Buffer& const_buffer = *buffer_;
-    const auto* bytes = static_cast<const std::byte*>(const_buffer.data());
-    return reinterpret_cast<const float*>(
-        bytes + byte_offset_ + element_offset * element_size(dtype_)
-    );
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Float access requires a float32 tensor.");
+    }
+    return reinterpret_cast<const float*>(byte_ptr(element_offset));
 }
 
 float& Tensor::at(std::initializer_list<size_t> indices){
@@ -234,6 +242,9 @@ const float& Tensor::at(std::initializer_list<size_t> indices) const{
 }
 
 float* Tensor::data(){
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Tensor::data() requires a float32 tensor.");
+    }
     if(numel() == 0){
         return nullptr;
     }
@@ -246,6 +257,9 @@ float* Tensor::data(){
 }
 
 const float* Tensor::data() const{
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Tensor::data() requires a float32 tensor.");
+    }
     if(numel() == 0){
         return nullptr;
     }
@@ -255,6 +269,32 @@ const float* Tensor::data() const{
     }
 
     return element_ptr(0);
+}
+
+BFloat16* Tensor::bfloat16_data(){
+    if(dtype_ != DataType::BFloat16){
+        throw std::logic_error("Tensor::bfloat16_data() requires a bfloat16 tensor.");
+    }
+    if(numel() == 0){
+        return nullptr;
+    }
+    if(!is_contiguous()){
+        throw std::logic_error("Tensor::bfloat16_data() requires a contiguous tensor.");
+    }
+    return reinterpret_cast<BFloat16*>(byte_ptr(0));
+}
+
+const BFloat16* Tensor::bfloat16_data() const{
+    if(dtype_ != DataType::BFloat16){
+        throw std::logic_error("Tensor::bfloat16_data() requires a bfloat16 tensor.");
+    }
+    if(numel() == 0){
+        return nullptr;
+    }
+    if(!is_contiguous()){
+        throw std::logic_error("Tensor::bfloat16_data() requires a contiguous tensor.");
+    }
+    return reinterpret_cast<const BFloat16*>(byte_ptr(0));
 }
 
 const Shape& Tensor::shape() const noexcept{
@@ -332,14 +372,17 @@ Tensor Tensor::clone() const{
     }
 
     if(is_contiguous()){
-        std::memcpy(copy.data(), data(), size_bytes());
+        std::memcpy(copy.byte_ptr(0), byte_ptr(0), size_bytes());
         return copy;
     }
 
-    float* copy_data = copy.data();
-
+    const size_t item_size = element_size(dtype_);
     for(size_t linear = 0; linear < count; linear++){
-        copy_data[linear] = *element_ptr(linear_offset(linear));
+        std::memcpy(
+            copy.byte_ptr(linear),
+            byte_ptr(linear_offset(linear)),
+            item_size
+        );
     }
 
     return copy;
@@ -352,13 +395,28 @@ void Tensor::fill(float value){
         return;
     }
 
-    if(is_contiguous()){
-        std::fill(data(), data() + count, value);
+    if(dtype_ == DataType::Float32){
+        if(is_contiguous()){
+            std::fill(data(), data() + count, value);
+            return;
+        }
+        for(size_t linear = 0; linear < count; linear++){
+            *element_ptr(linear_offset(linear)) = value;
+        }
         return;
     }
 
+    const BFloat16 converted = BFloat16::from_float(value);
+    if(is_contiguous()){
+        std::fill(bfloat16_data(), bfloat16_data() + count, converted);
+        return;
+    }
     for(size_t linear = 0; linear < count; linear++){
-        *element_ptr(linear_offset(linear)) = value;
+        std::memcpy(
+            byte_ptr(linear_offset(linear)),
+            &converted,
+            sizeof(converted)
+        );
     }
 }
 

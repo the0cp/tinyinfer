@@ -56,6 +56,16 @@ void expect_tensor(const Tensor& tensor, const Shape& shape, const std::vector<f
     }
 }
 
+Tensor bfloat16_tensor(Shape shape, const std::vector<float>& values){
+    expect(tensor_numel(shape) == values.size(), "bfloat16 tensor value count");
+    auto buffer = make_cpu_buffer(values.size() * sizeof(BFloat16));
+    auto* data = static_cast<BFloat16*>(buffer->data());
+    for(size_t i = 0; i < values.size(); i++){
+        data[i] = BFloat16::from_float(values[i]);
+    }
+    return Tensor(buffer, 0, std::move(shape), DataType::BFloat16);
+}
+
 template<typename Function>
 void expect_throw(Function&& function, const std::string& needle){
     try{
@@ -187,6 +197,42 @@ void test_linear_softmax_and_sequential(){
     expect(model.size() == 3, "Sequential size");
     Tensor result = model.forward(input);
     expect_close(result.data()[0] + result.data()[1] + result.data()[2], 1.0f);
+}
+
+void test_bfloat16_weight_ops(){
+    const Tensor embedding_weight = bfloat16_tensor(
+        {3, 2},
+        {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}
+    );
+    const int64_t token_ids[]{2, 0};
+    expect_tensor(
+        embedding(embedding_weight, token_ids),
+        {2, 2},
+        {5.0f, 6.0f, 1.0f, 2.0f}
+    );
+
+    const Tensor input({1, 2}, {1.0f, 2.0f});
+    const Tensor weight = bfloat16_tensor(
+        {2, 3},
+        {1.0f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f}
+    );
+    const Tensor bias = bfloat16_tensor({3}, {0.5f, -0.5f, 1.0f});
+    expect_tensor(linear(input, weight, bias), {1, 3}, {1.5f, 1.5f, 2.0f});
+
+    ThreadPool pool(2);
+    Tensor threaded({2, 3});
+    const Tensor two_rows({2, 2}, {1.0f, 2.0f, 1.0f, 2.0f});
+    threadpool_linear_out(two_rows, weight, bias, threaded, pool, 2);
+    expect_tensor(
+        threaded,
+        {2, 3},
+        {1.5f, 1.5f, 2.0f, 1.5f, 1.5f, 2.0f}
+    );
+
+    const Tensor norm_weight = bfloat16_tensor({2}, {1.0f, 0.5f});
+    const Tensor normalized = rms_norm(input, norm_weight, 1e-6f);
+    const float scale = 1.0f / std::sqrt(2.5f + 1e-6f);
+    expect_tensor(normalized, {1, 2}, {scale, scale});
 }
 
 void test_operator_registry_schema_only(){
@@ -499,6 +545,7 @@ int main(){
         {"add_relu_and_transpose", test_add_relu_and_transpose},
         {"matmul_implementations", test_matmul_implementations},
         {"linear_softmax_and_sequential", test_linear_softmax_and_sequential},
+        {"bfloat16_weight_ops", test_bfloat16_weight_ops},
         {"operator_registry_schema_only", test_operator_registry_schema_only},
         {"kernel_registry", test_kernel_registry},
         {"thread_pool", test_thread_pool},

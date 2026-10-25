@@ -33,6 +33,13 @@ struct DecoderBlockWeights{
     Tensor down_weight;
 };
 
+// Validate during construction for early errors. Execution entry points repeat
+// these lightweight checks so a failed call cannot partially update its cache.
+void validate_decoder_block(
+    const DecoderBlockConfig& config,
+    const DecoderBlockWeights& weights
+);
+
 Tensor rope_half_split(
     const Tensor& input,
     size_t position_offset,

@@ -184,6 +184,7 @@ DecoderBlockWeights make_weights(){
 void test_block_matches_transformers_reference(){
     const DecoderBlockConfig config{4, 8, 2, 1, 1e-6f, 10000.0f};
     const DecoderBlockWeights weights = make_weights();
+    validate_decoder_block(config, weights);
     const Tensor input(
         {3, 4},
         {
@@ -229,23 +230,37 @@ void test_block_matches_transformers_reference(){
     expect(decode_cache.size_tokens() == 3, "decode cache size");
 }
 
-void test_block_validation_precedes_cache_mutation(){
+void test_invalid_weights_do_not_mutate_cache(){
     const DecoderBlockConfig config{4, 8, 2, 1, 1e-6f, 10000.0f};
     DecoderBlockWeights weights = make_weights();
     weights.down_weight = Tensor({7, 4});
-    ContiguousKvCache cache({2, 1, 2});
+    const Tensor one_token({1, 4}, {0.2f, -0.1f, 0.4f, 0.3f});
+
+    ContiguousKvCache prefill_cache({2, 1, 2});
     expect_throw(
         [&](){
-            (void)decoder_block_prefill(Tensor({1, 4}), config, weights, cache);
+            (void)decoder_block_prefill(one_token, config, weights, prefill_cache);
         },
         "down_weight"
     );
-    expect(cache.size_tokens() == 0, "invalid block leaves cache empty");
+    expect(prefill_cache.size_tokens() == 0, "invalid prefill leaves cache empty");
+
+    ContiguousKvCache decode_cache({2, 1, 2});
+    const DecoderBlockWeights valid_weights = make_weights();
+    (void)decoder_block_prefill(one_token, config, valid_weights, decode_cache);
+    expect_throw(
+        [&](){
+            (void)decoder_block_decode(one_token, config, weights, decode_cache);
+        },
+        "down_weight"
+    );
+    expect(decode_cache.size_tokens() == 1, "invalid decode leaves cache unchanged");
 }
 
 void test_cache_preconditions_precede_projection(){
     const DecoderBlockConfig config{4, 8, 2, 1, 1e-6f, 10000.0f};
     const DecoderBlockWeights weights = make_weights();
+    validate_decoder_block(config, weights);
     const Tensor one_token({1, 4}, {0.2f, -0.1f, 0.4f, 0.3f});
 
     ContiguousKvCache non_empty({2, 1, 2});
@@ -278,7 +293,7 @@ int main(){
     test_transformer_ops();
     test_half_split_rope_layout();
     test_block_matches_transformers_reference();
-    test_block_validation_precedes_cache_mutation();
+    test_invalid_weights_do_not_mutate_cache();
     test_cache_preconditions_precede_projection();
     std::cout << "decoder block tests passed\n";
     return 0;

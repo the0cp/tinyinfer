@@ -21,18 +21,21 @@ void require_output(const Tensor& out, const Shape& shape, const char* operation
     }
 }
 
-void require_disjoint_input(const Tensor& input, const Tensor& out, const char* operation){
-    if(input.dtype() != DataType::Float32 || !input.is_contiguous()){
-        throw std::runtime_error(std::string(operation) + " requires contiguous float32 input.");
-    }
+void require_disjoint_storage(
+    const Tensor& input,
+    const Tensor& out,
+    const char* operation
+){
     const size_t input_bytes = input.size_bytes();
     const size_t output_bytes = out.size_bytes();
     if(input_bytes == 0 || output_bytes == 0){
         return;
     }
 
-    const auto input_address = reinterpret_cast<std::uintptr_t>(input.data());
-    const auto output_address = reinterpret_cast<std::uintptr_t>(out.data());
+    const auto input_address = reinterpret_cast<std::uintptr_t>(input.buffer()->data()) +
+        input.byte_offset();
+    const auto output_address = reinterpret_cast<std::uintptr_t>(out.buffer()->data()) +
+        out.byte_offset();
     // Subtraction avoids overflowing an end-address calculation. Checking real
     // ranges also covers partial overlap and separately wrapped external memory.
     const bool overlaps = input_address <= output_address
@@ -41,6 +44,34 @@ void require_disjoint_input(const Tensor& input, const Tensor& out, const char* 
     if(overlaps){
         throw std::invalid_argument(std::string(operation) + " input/output ranges overlap.");
     }
+}
+
+void require_disjoint_input(const Tensor& input, const Tensor& out, const char* operation){
+    if(input.dtype() != DataType::Float32 || !input.is_contiguous()){
+        throw std::runtime_error(std::string(operation) + " requires contiguous float32 input.");
+    }
+    require_disjoint_storage(input, out, operation);
+}
+
+void require_weight(const Tensor& weight, const Tensor& out, const char* operation){
+    if(
+        (weight.dtype() != DataType::Float32 &&
+         weight.dtype() != DataType::BFloat16) ||
+        !weight.is_contiguous()
+    ){
+        throw std::runtime_error(
+            std::string(operation) + " requires contiguous float32 or bfloat16 weights."
+        );
+    }
+    require_disjoint_storage(weight, out, operation);
+}
+
+float as_float(float value) noexcept{
+    return value;
+}
+
+float as_float(BFloat16 value) noexcept{
+    return value.to_float();
 }
 
 struct LinearDimensions{
@@ -72,11 +103,74 @@ LinearDimensions prepare_linear(
 
     require_output(out, Shape{dimensions.batch, dimensions.output_features}, "linear");
     require_disjoint_input(x, out, "linear");
-    require_disjoint_input(weight, out, "linear");
+    require_weight(weight, out, "linear");
     if(bias != nullptr){
-        require_disjoint_input(*bias, out, "linear");
+        require_weight(*bias, out, "linear");
     }
     return dimensions;
+}
+
+template<typename Value>
+void init_linear_rows(
+    const Value* bias,
+    float* out,
+    const LinearDimensions& dimensions,
+    size_t row_begin,
+    size_t row_end
+){
+    for(size_t row = row_begin; row < row_end; row++){
+        float* out_row = out + row * dimensions.output_features;
+        for(size_t column = 0; column < dimensions.output_features; column++){
+            out_row[column] = as_float(bias[column]);
+        }
+    }
+}
+
+void init_linear_rows(
+    const Tensor* bias,
+    Tensor& out,
+    const LinearDimensions& dimensions,
+    size_t row_begin,
+    size_t row_end
+){
+    float* out_data = out.data();
+    if(bias == nullptr){
+        std::fill(
+            out_data + row_begin * dimensions.output_features,
+            out_data + row_end * dimensions.output_features,
+            0.0f
+        );
+    }else if(bias->dtype() == DataType::Float32){
+        init_linear_rows(
+            bias->data(), out_data, dimensions, row_begin, row_end
+        );
+    }else{
+        init_linear_rows(
+            bias->bfloat16_data(), out_data, dimensions, row_begin, row_end
+        );
+    }
+}
+
+template<typename Weight>
+void accumulate_linear_rows(
+    const float* x_data,
+    const Weight* weight_data,
+    float* out_data,
+    const LinearDimensions& dimensions,
+    size_t row_begin,
+    size_t row_end
+){
+    for(size_t row = row_begin; row < row_end; row++){
+        float* out_row = out_data + row * dimensions.output_features;
+        for(size_t inner = 0; inner < dimensions.input_features; inner++){
+            const float x_value = x_data[row * dimensions.input_features + inner];
+            const Weight* weight_row =
+                weight_data + inner * dimensions.output_features;
+            for(size_t column = 0; column < dimensions.output_features; column++){
+                out_row[column] += x_value * as_float(weight_row[column]);
+            }
+        }
+    }
 }
 
 void compute_linear_rows(
@@ -89,26 +183,26 @@ void compute_linear_rows(
     size_t row_end
 ){
     const float* x_data = x.data();
-    const float* weight_data = weight.data();
-    const float* bias_data = bias == nullptr ? nullptr : bias->data();
     float* out_data = out.data();
-
-    for(size_t row = row_begin; row < row_end; row++){
-        float* out_row = out_data + row * dimensions.output_features;
-
-        for(size_t column = 0; column < dimensions.output_features; column++){
-            out_row[column] = bias_data == nullptr ? 0.0f : bias_data[column];
-        }
-
-        for(size_t inner = 0; inner < dimensions.input_features; inner++){
-            const float x_value = x_data[row * dimensions.input_features + inner];
-            const float* weight_row =
-                weight_data + inner * dimensions.output_features;
-
-            for(size_t column = 0; column < dimensions.output_features; column++){
-                out_row[column] += x_value * weight_row[column];
-            }
-        }
+    init_linear_rows(bias, out, dimensions, row_begin, row_end);
+    if(weight.dtype() == DataType::Float32){
+        accumulate_linear_rows(
+            x_data,
+            weight.data(),
+            out_data,
+            dimensions,
+            row_begin,
+            row_end
+        );
+    }else{
+        accumulate_linear_rows(
+            x_data,
+            weight.bfloat16_data(),
+            out_data,
+            dimensions,
+            row_begin,
+            row_end
+        );
     }
 }
 
@@ -464,15 +558,26 @@ void embedding_out(
     }
 
     require_output(out, {token_ids.size(), hidden_size}, "embedding");
-    require_disjoint_input(weight, out, "embedding");
+    require_weight(weight, out, "embedding");
 
-    for(size_t token = 0; token < token_ids.size(); token++){
-        const size_t row = static_cast<size_t>(token_ids[token]);
-        std::copy_n(
-            weight.data() + row * hidden_size,
-            hidden_size,
-            out.data() + token * hidden_size
-        );
+    if(weight.dtype() == DataType::Float32){
+        for(size_t token = 0; token < token_ids.size(); token++){
+            const size_t row = static_cast<size_t>(token_ids[token]);
+            std::copy_n(
+                weight.data() + row * hidden_size,
+                hidden_size,
+                out.data() + token * hidden_size
+            );
+        }
+    }else{
+        const BFloat16* source = weight.bfloat16_data();
+        for(size_t token = 0; token < token_ids.size(); token++){
+            const size_t row = static_cast<size_t>(token_ids[token]);
+            float* destination = out.data() + token * hidden_size;
+            for(size_t feature = 0; feature < hidden_size; feature++){
+                destination[feature] = source[row * hidden_size + feature].to_float();
+            }
+        }
     }
 }
 
@@ -620,7 +725,7 @@ void rms_norm_out(
 
     require_output(out, x.shape(), "rms_norm");
     require_disjoint_input(x, out, "rms_norm");
-    require_disjoint_input(weight, out, "rms_norm");
+    require_weight(weight, out, "rms_norm");
 
     const size_t rows = x.numel() / features;
 
@@ -637,8 +742,16 @@ void rms_norm_out(
             square_sum / static_cast<float>(features) + epsilon
         );
 
-        for(size_t feature = 0; feature < features; feature++){
-            destination[feature] = source[feature] * scale * weight.data()[feature];
+        if(weight.dtype() == DataType::Float32){
+            for(size_t feature = 0; feature < features; feature++){
+                destination[feature] = source[feature] * scale * weight.data()[feature];
+            }
+        }else{
+            const BFloat16* norm_weight = weight.bfloat16_data();
+            for(size_t feature = 0; feature < features; feature++){
+                destination[feature] =
+                    source[feature] * scale * norm_weight[feature].to_float();
+            }
         }
     }
 }

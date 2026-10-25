@@ -48,6 +48,8 @@ public:
 
     float* data();
     const float* data() const;
+    BFloat16* bfloat16_data();
+    const BFloat16* bfloat16_data() const;
 
     const Shape& shape() const noexcept;
     const Strides& strides() const noexcept;
@@ -76,6 +78,8 @@ private:
     size_t linear_offset(size_t linear_index) const;
     size_t required_span_bytes() const;
     void validate_layout() const;
+    std::byte* byte_ptr(size_t element_offset);
+    const std::byte* byte_ptr(size_t element_offset) const;
     float* element_ptr(size_t element_offset);
     const float* element_ptr(size_t element_offset) const;
 };

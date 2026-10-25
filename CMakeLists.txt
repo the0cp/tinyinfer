@@ -39,6 +39,7 @@ add_library(tinyinfer
     src/paged_kv_cache.cpp
     src/attention.cpp
     src/decoder_block.cpp
+    src/qwen_model.cpp
     src/ops.cpp
     src/thread_pool.cpp
     src/threading_policy.cpp
@@ -70,43 +71,23 @@ else()
     target_compile_options(tinyinfer PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
 endif()
 
-add_executable(test_ops tests/test_ops.cpp)
-target_link_libraries(test_ops PRIVATE tinyinfer)
-
-add_executable(test_runtime tests/test_runtime.cpp)
-target_link_libraries(test_runtime PRIVATE tinyinfer)
-
-add_executable(test_tensor_storage tests/test_tensor_storage.cpp)
-target_link_libraries(test_tensor_storage PRIVATE tinyinfer)
-
-add_executable(test_memory_plan tests/test_memory_plan.cpp)
-target_link_libraries(test_memory_plan PRIVATE tinyinfer)
-
-add_executable(test_threading_policy tests/test_threading_policy.cpp)
-target_link_libraries(test_threading_policy PRIVATE tinyinfer)
-
-add_executable(test_kernel_selection tests/test_kernel_selection.cpp)
-target_link_libraries(test_kernel_selection PRIVATE tinyinfer)
-
-add_executable(test_attention tests/test_attention.cpp)
-target_link_libraries(test_attention PRIVATE tinyinfer)
-
-add_executable(test_paged_kv_cache tests/test_paged_kv_cache.cpp)
-target_link_libraries(test_paged_kv_cache PRIVATE tinyinfer)
-
-add_executable(test_decoder_block tests/test_decoder_block.cpp)
-target_link_libraries(test_decoder_block PRIVATE tinyinfer)
-
 enable_testing()
-add_test(NAME test_ops COMMAND test_ops)
-add_test(NAME test_runtime COMMAND test_runtime)
-add_test(NAME test_tensor_storage COMMAND test_tensor_storage)
-add_test(NAME test_memory_plan COMMAND test_memory_plan)
-add_test(NAME test_threading_policy COMMAND test_threading_policy)
-add_test(NAME test_kernel_selection COMMAND test_kernel_selection)
-add_test(NAME test_attention COMMAND test_attention)
-add_test(NAME test_paged_kv_cache COMMAND test_paged_kv_cache)
-add_test(NAME test_decoder_block COMMAND test_decoder_block)
+foreach(test_name IN ITEMS
+    ops
+    runtime
+    tensor_storage
+    memory_plan
+    threading_policy
+    kernel_selection
+    attention
+    paged_kv_cache
+    decoder_block
+    qwen_model
+)
+    add_executable(test_${test_name} tests/test_${test_name}.cpp)
+    target_link_libraries(test_${test_name} PRIVATE tinyinfer)
+    add_test(NAME test_${test_name} COMMAND test_${test_name})
+endforeach()
 
 add_executable(demo examples/mlp.cpp)
 target_link_libraries(demo PRIVATE tinyinfer)
@@ -126,29 +107,23 @@ target_link_libraries(model_demo PRIVATE tinyinfer)
 add_executable(runtime_demo examples/runtime_demo.cpp)
 target_link_libraries(runtime_demo PRIVATE tinyinfer)
 
-add_executable(bench_matmul benchmark/bench_matmul.cpp)
-target_link_libraries(bench_matmul PRIVATE tinyinfer)
+add_executable(check_qwen_layer0 tools/check_qwen_layer0.cpp)
+target_link_libraries(check_qwen_layer0 PRIVATE tinyinfer)
 
-add_executable(bench_graph_scheduler benchmark/bench_graph_scheduler.cpp)
-target_link_libraries(bench_graph_scheduler PRIVATE tinyinfer)
-
-add_executable(bench_session benchmark/bench_session.cpp)
-target_link_libraries(bench_session PRIVATE tinyinfer)
-
-add_executable(bench_profiler benchmark/bench_profiler.cpp)
-target_link_libraries(bench_profiler PRIVATE tinyinfer)
-
-add_executable(bench_tensor_storage benchmark/bench_tensor_storage.cpp)
-target_link_libraries(bench_tensor_storage PRIVATE tinyinfer)
-
-add_executable(bench_memory_plan benchmark/bench_memory_plan.cpp)
-target_link_libraries(bench_memory_plan PRIVATE tinyinfer)
-
-add_executable(bench_kernel_selection benchmark/bench_kernel_selection.cpp)
-target_link_libraries(bench_kernel_selection PRIVATE tinyinfer)
-
-add_executable(bench_kv_cache benchmark/bench_kv_cache.cpp)
-target_link_libraries(bench_kv_cache PRIVATE tinyinfer)
-
-add_executable(bench_paged_kv_cache benchmark/bench_paged_kv_cache.cpp)
-target_link_libraries(bench_paged_kv_cache PRIVATE tinyinfer)
+foreach(benchmark_name IN ITEMS
+    matmul
+    graph_scheduler
+    session
+    profiler
+    tensor_storage
+    memory_plan
+    kernel_selection
+    kv_cache
+    paged_kv_cache
+)
+    add_executable(
+        bench_${benchmark_name}
+        benchmark/bench_${benchmark_name}.cpp
+    )
+    target_link_libraries(bench_${benchmark_name} PRIVATE tinyinfer)
+endforeach()

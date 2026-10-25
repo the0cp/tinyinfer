@@ -5,6 +5,7 @@
 #include "ops.h"
 #include "tensor.h"
 
+#include <bit>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -60,6 +61,16 @@ std::shared_ptr<Buffer> float_buffer(std::initializer_list<float> values){
     return buffer;
 }
 
+std::shared_ptr<Buffer> bfloat16_buffer(std::initializer_list<float> values){
+    auto buffer = make_cpu_buffer(values.size() * sizeof(BFloat16));
+    auto* data = static_cast<BFloat16*>(buffer->data());
+    size_t index = 0;
+    for(float value : values){
+        data[index++] = BFloat16::from_float(value);
+    }
+    return buffer;
+}
+
 Tensor make_shared_view(){
     auto buffer = float_buffer({1.0f, 2.0f, 3.0f, 4.0f});
     return Tensor(buffer, 0, {2, 2});
@@ -69,6 +80,27 @@ void test_dtype_and_checked_byte_helpers(){
     expect(element_size(DataType::Float32) == sizeof(float), "float32 element size");
     expect(element_alignment(DataType::Float32) == alignof(float), "float32 alignment");
     expect(data_type_name(DataType::Float32) == "float32", "float32 name");
+    expect(element_size(DataType::BFloat16) == 2, "bfloat16 element size");
+    expect(element_alignment(DataType::BFloat16) == alignof(BFloat16), "bfloat16 alignment");
+    expect(data_type_name(DataType::BFloat16) == "bfloat16", "bfloat16 name");
+    expect(BFloat16::from_float(1.0f).bits == 0x3f80, "bfloat16 one bits");
+    expect_close(BFloat16::from_float(-2.5f).to_float(), -2.5f);
+    expect(
+        BFloat16::from_float(std::bit_cast<float>(0x3f808000U)).bits == 0x3f80,
+        "bfloat16 halfway value rounds to even"
+    );
+    expect(
+        BFloat16::from_float(std::bit_cast<float>(0x3f818000U)).bits == 0x3f82,
+        "bfloat16 halfway value rounds up to even"
+    );
+    expect(
+        std::isinf(BFloat16::from_float(std::numeric_limits<float>::infinity()).to_float()),
+        "bfloat16 preserves infinity"
+    );
+    expect(
+        std::isnan(BFloat16::from_float(std::numeric_limits<float>::quiet_NaN()).to_float()),
+        "bfloat16 preserves NaN"
+    );
     expect(tensor_numel({2, 3, 4}) == 24, "checked numel");
     expect(tensor_bytes({2, 3}) == 6 * sizeof(float), "checked bytes");
 
@@ -81,6 +113,26 @@ void test_dtype_and_checked_byte_helpers(){
         tensor_numel({0, std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max()}) == 0,
         "an empty shape must not overflow on unreachable dimensions"
     );
+}
+
+void test_bfloat16_storage_access_clone_and_fill(){
+    auto buffer = bfloat16_buffer({1.0f, 2.0f, 99.0f, 3.0f, 4.0f, 99.0f});
+    Tensor view(buffer, 0, {2, 2}, Strides{3, 1}, DataType::BFloat16);
+    expect(view.dtype() == DataType::BFloat16, "bfloat16 view dtype");
+    expect(view.size_bytes() == 4 * sizeof(BFloat16), "bfloat16 logical bytes");
+    expect_throw([&](){ (void)view.data(); }, "float32");
+    expect_throw([&](){ (void)view.bfloat16_data(); }, "contiguous");
+
+    Tensor clone = view.clone();
+    expect(clone.is_contiguous(), "bfloat16 clone is contiguous");
+    expect(clone.bfloat16_data()[0].to_float() == 1.0f, "bfloat16 clone first");
+    expect(clone.bfloat16_data()[2].to_float() == 3.0f, "bfloat16 clone strided");
+
+    view.fill(1.5f);
+    const auto* raw = static_cast<const BFloat16*>(buffer->data());
+    expect(raw[0].to_float() == 1.5f, "bfloat16 fill first row");
+    expect(raw[3].to_float() == 1.5f, "bfloat16 fill second row");
+    expect(raw[2].to_float() == 99.0f, "bfloat16 fill preserves padding");
 }
 
 void test_cpu_buffer_contract(){
@@ -303,6 +355,7 @@ struct TestCase{
 int main(){
     const TestCase tests[]{
         {"dtype_and_checked_byte_helpers", test_dtype_and_checked_byte_helpers},
+        {"bfloat16_storage_access_clone_and_fill", test_bfloat16_storage_access_clone_and_fill},
         {"cpu_buffer_contract", test_cpu_buffer_contract},
         {"tensor_owning_constructors_keep_source_api", test_tensor_owning_constructors_keep_source_api},
         {"shared_storage_lifetime_aliasing_and_clone", test_shared_storage_lifetime_aliasing_and_clone},

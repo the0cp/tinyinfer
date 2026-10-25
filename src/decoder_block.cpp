@@ -3,7 +3,9 @@
 #include "attention.h"
 #include "ops.h"
 
+#include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -12,25 +14,29 @@ namespace tinyinfer{
 
 namespace{
 
-void require_shape(const Tensor& tensor, const Shape& expected, const char* name){
-    if(tensor.shape() != expected){
+void require_shape(
+    const Tensor& tensor,
+    std::initializer_list<size_t> expected,
+    const char* name
+){
+    if(
+        tensor.dim() != expected.size() ||
+        !std::equal(expected.begin(), expected.end(), tensor.shape().begin())
+    ){
         throw std::invalid_argument(std::string(name) + " shape mismatch.");
     }
-    if(tensor.dtype() != DataType::Float32 || !tensor.is_contiguous()){
+    if(
+        (tensor.dtype() != DataType::Float32 &&
+         tensor.dtype() != DataType::BFloat16) ||
+        !tensor.is_contiguous()
+    ){
         throw std::invalid_argument(
-            std::string(name) + " must be contiguous float32."
+            std::string(name) + " must be contiguous float32 or bfloat16."
         );
     }
 }
 
-// The model loader will move fixed config/weight checks to construction time.
-// Until then, the free-function API keeps the complete contract here.
-size_t validate_block(
-    const Tensor& hidden_states,
-    const DecoderBlockConfig& config,
-    const DecoderBlockWeights& weights,
-    const ContiguousKvCache& cache
-){
+size_t validate_config(const DecoderBlockConfig& config){
     if(
         config.hidden_size == 0 || config.intermediate_size == 0 ||
         config.query_heads == 0 || config.kv_heads == 0
@@ -60,20 +66,14 @@ size_t validate_block(
         throw std::invalid_argument("Decoder RoPE theta must be finite and positive.");
     }
 
-    if(hidden_states.dim() != 2 || hidden_states.shape()[1] != config.hidden_size){
-        throw std::invalid_argument(
-            "Decoder hidden states must have shape [tokens, hidden_size]."
-        );
-    }
+    return head_dim;
+}
 
-    if(hidden_states.shape()[0] == 0){
-        throw std::invalid_argument("Decoder block requires at least one token.");
-    }
-
-    if(hidden_states.dtype() != DataType::Float32 || !hidden_states.is_contiguous()){
-        throw std::invalid_argument("Decoder hidden states must be contiguous float32.");
-    }
-
+void validate_weights(
+    const DecoderBlockConfig& config,
+    const DecoderBlockWeights& weights,
+    size_t head_dim
+){
     const size_t kv_size = config.kv_heads * head_dim;
 
     require_shape(weights.input_norm, {config.hidden_size}, "input_norm");
@@ -112,6 +112,30 @@ size_t validate_block(
         {config.intermediate_size, config.hidden_size},
         "down_weight"
     );
+}
+
+size_t validate_execution(
+    const Tensor& hidden_states,
+    const DecoderBlockConfig& config,
+    const DecoderBlockWeights& weights,
+    const ContiguousKvCache& cache
+){
+    const size_t head_dim = validate_config(config);
+    validate_weights(config, weights, head_dim);
+
+    if(hidden_states.dim() != 2 || hidden_states.shape()[1] != config.hidden_size){
+        throw std::invalid_argument(
+            "Decoder hidden states must have shape [tokens, hidden_size]."
+        );
+    }
+
+    if(hidden_states.shape()[0] == 0){
+        throw std::invalid_argument("Decoder block requires at least one token.");
+    }
+
+    if(hidden_states.dtype() != DataType::Float32 || !hidden_states.is_contiguous()){
+        throw std::invalid_argument("Decoder hidden states must be contiguous float32.");
+    }
 
     if(cache.num_heads() != config.kv_heads || cache.head_dim() != head_dim){
         throw std::invalid_argument("Decoder block shape does not match the KV cache.");
@@ -205,6 +229,14 @@ Qkv project_qkv(
 
 }
 
+void validate_decoder_block(
+    const DecoderBlockConfig& config,
+    const DecoderBlockWeights& weights
+){
+    const size_t head_dim = validate_config(config);
+    validate_weights(config, weights, head_dim);
+}
+
 /*
  * Rotary Position Embedding (RoPE)
  *
@@ -289,7 +321,12 @@ Tensor decoder_block_prefill(
     const DecoderBlockWeights& weights,
     ContiguousKvCache& cache
 ){
-    const size_t head_dim = validate_block(hidden_states, config, weights, cache);
+    const size_t head_dim = validate_execution(
+        hidden_states,
+        config,
+        weights,
+        cache
+    );
 
     if(cache.size_tokens() != 0){
         throw std::logic_error("Decoder block prefill requires an empty KV cache.");
@@ -316,7 +353,12 @@ Tensor decoder_block_decode(
     const DecoderBlockWeights& weights,
     ContiguousKvCache& cache
 ){
-    const size_t head_dim = validate_block(hidden_state, config, weights, cache);
+    const size_t head_dim = validate_execution(
+        hidden_state,
+        config,
+        weights,
+        cache
+    );
 
     if(hidden_state.shape()[0] != 1){
         throw std::invalid_argument("Decoder block decode accepts exactly one token.");
