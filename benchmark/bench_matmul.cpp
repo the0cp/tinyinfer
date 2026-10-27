@@ -1,5 +1,5 @@
-#include "ops.h"
-#include "thread_pool.h"
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/core/thread_pool.h>
 
 #include <chrono>
 #include <iostream>

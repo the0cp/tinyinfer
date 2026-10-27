@@ -1,6 +1,6 @@
-#include "decoder_block.h"
-#include "ops.h"
-#include "qwen_model.h"
+#include <tinyinfer/llm/decoder_block.h>
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/llm/qwen2.h>
 
 #include <algorithm>
 #include <bit>

@@ -36,7 +36,7 @@ Graph → validation / optimization → ExecutionPlan + MemoryPlan
       → ExecutionFrame → selected kernels → output Tensor
 ```
 
-Attention and KV caches currently sit beside this pipeline rather than inside a complete model executor. Paged KV cache maps logical token positions to fixed-size physical blocks; `share_prefix_from()` reuses complete prefix blocks without copying K/V. Prefix compatibility must be established by the caller.
+Attention and KV caches sit beside the Graph pipeline and are orchestrated directly by `Qwen2Decoder`. Paged KV cache maps logical token positions to fixed-size physical blocks; `share_prefix_from()` reuses complete prefix blocks without copying K/V.
 
 The intended end state is deliberately small:
 
@@ -47,8 +47,6 @@ tinyinfer CLI
                          │
         shared Tensor / Buffer / CPU ops / ThreadPool
 ```
-
-The next priority is a numerically verified, end-to-end pretrained Transformer path—not more cache policies, graph abstractions, or backend interfaces.
 
 ## Build and test
 

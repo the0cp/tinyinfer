@@ -1,5 +1,5 @@
-#include "ops.h"
-#include "decoder_block.h"
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/llm/decoder_block.h>
 
 #include <cmath>
 #include <cstdint>

@@ -1,9 +1,9 @@
-#include "buffer.h"
-#include "data_type.h"
-#include "inference_session.h"
-#include "model_loader.h"
-#include "ops.h"
-#include "tensor.h"
+#include <tinyinfer/core/buffer.h>
+#include <tinyinfer/core/data_type.h>
+#include <tinyinfer/runtime/inference_session.h>
+#include <tinyinfer/runtime/model_loader.h>
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/core/tensor.h>
 
 #include <bit>
 #include <cmath>

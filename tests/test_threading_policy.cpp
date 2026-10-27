@@ -1,7 +1,7 @@
-#include "inference_session.h"
-#include "ops.h"
-#include "thread_pool.h"
-#include "threading_policy.h"
+#include <tinyinfer/runtime/inference_session.h>
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/core/thread_pool.h>
+#include <tinyinfer/runtime/threading_policy.h>
 
 #include <atomic>
 #include <cmath>

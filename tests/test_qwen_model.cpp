@@ -1,4 +1,4 @@
-#include "qwen_model.h"
+#include <tinyinfer/llm/qwen2.h>
 
 #include <cmath>
 #include <cstdint>

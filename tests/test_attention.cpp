@@ -1,5 +1,5 @@
-#include "attention.h"
-#include "kv_cache.h"
+#include <tinyinfer/llm/attention.h>
+#include <tinyinfer/llm/kv_cache.h>
 
 #include <cmath>
 #include <iostream>

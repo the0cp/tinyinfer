@@ -1,10 +1,10 @@
-#include "execution_frame.h"
-#include "executor.h"
-#include "inference_session.h"
-#include "kernel_registry.h"
-#include "operator_registry.h"
-#include "ops.h"
-#include "session_state.h"
+#include <tinyinfer/runtime/execution_frame.h>
+#include <tinyinfer/runtime/executor.h>
+#include <tinyinfer/runtime/inference_session.h>
+#include <tinyinfer/runtime/kernel_registry.h>
+#include <tinyinfer/graph/operator_registry.h>
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/runtime/session_state.h>
 
 #include <atomic>
 #include <cmath>

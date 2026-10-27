@@ -1,4 +1,4 @@
-#include "inference_session.h"
+#include <tinyinfer/runtime/inference_session.h>
 
 #include <iostream>
 

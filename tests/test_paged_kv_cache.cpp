@@ -1,5 +1,5 @@
-#include "attention.h"
-#include "paged_kv_cache.h"
+#include <tinyinfer/llm/attention.h>
+#include <tinyinfer/llm/paged_kv_cache.h>
 
 #include <cmath>
 #include <iostream>

@@ -1,0 +1,248 @@
+#include <tinyinfer/runtime/inference_session.h>
+
+#include <tinyinfer/runtime/execution_frame.h>
+#include <tinyinfer/runtime/executor.h>
+#include <tinyinfer/runtime/profiler.h>
+
+#include <stdexcept>
+#include <thread>
+#include <utility>
+
+namespace tinyinfer{
+
+namespace{
+
+std::string current_exception_message(){
+    try{
+        throw;
+    }catch(const std::exception& error){
+        return error.what();
+    }catch(...){
+        return "non-standard exception";
+    }
+}
+
+}
+
+InferenceSession::InferenceSession(SessionOptions options) : options_(options){}
+
+void InferenceSession::load(
+    Graph graph,
+    std::string input_name,
+    Shape input_shape,
+    std::string output_name
+){
+    if(lifecycle_ == SessionLifecycle::Initialized){
+        throw std::logic_error("Cannot load a new Graph into an initialized InferenceSession.");
+    }
+
+    loaded_graph_ = std::move(graph);
+    input_name_ = std::move(input_name);
+    input_shape_ = std::move(input_shape);
+    output_name_ = std::move(output_name);
+    metadata_.reset();
+    session_state_.reset();
+    threading_plan_.reset();
+    worker_pool_.reset();
+    lifecycle_ = SessionLifecycle::Loaded;
+}
+
+void InferenceSession::load(LoadedGraph loaded_graph){
+    ModelMetadata metadata = loaded_graph.metadata;
+
+    load(
+        std::move(loaded_graph.graph),
+        metadata.input_name,
+        metadata.input_shape,
+        metadata.output_name
+    );
+
+    metadata_ = std::move(metadata);
+}
+
+void InferenceSession::initialize(){
+    if(lifecycle_ != SessionLifecycle::Loaded || !loaded_graph_){
+        throw std::logic_error("InferenceSession::initialize requires a loaded Graph.");
+    }
+
+    Graph candidate = *loaded_graph_;
+
+    if(options_.enable_graph_optimization && pass_manager_.size() != 0){
+        pass_manager_.run(
+            candidate,
+            GraphOptimizationContext{input_name_, input_shape_, output_name_},
+            operator_registry_
+        );
+    }
+
+    candidate.resolve(input_name_, input_shape_, output_name_, operator_registry_);
+    const ThreadingPlan new_threading_plan = ThreadingPlan::build(
+        options_,
+        static_cast<size_t>(std::thread::hardware_concurrency())
+    );
+    MemoryPlanningPolicy memory_policy = MemoryPlanningPolicy::Disabled;
+
+    if(options_.enable_memory_planning){
+        memory_policy = new_threading_plan.effective_execution_mode() ==
+                ExecutionMode::Sequential
+            ? MemoryPlanningPolicy::SequentialReuse
+            : MemoryPlanningPolicy::Dedicated;
+    }
+
+    auto new_state = std::make_unique<SessionState>(
+        SessionState::build(
+            std::move(candidate),
+            operator_registry_,
+            kernel_registry_,
+            memory_policy,
+            new_threading_plan
+        )
+    );
+    std::unique_ptr<ThreadPool> new_worker_pool;
+
+    if(new_threading_plan.effective_execution_mode() == ExecutionMode::Parallel){
+        new_worker_pool = std::make_unique<ThreadPool>(
+            new_threading_plan.effective_inter_op_threads()
+        );
+    }else if(new_threading_plan.effective_intra_op_threads() > 1 &&
+             new_state->requires_intra_op_thread_pool()){
+        new_worker_pool = std::make_unique<ThreadPool>(
+            new_threading_plan.effective_intra_op_threads()
+        );
+    }
+
+    session_state_ = std::move(new_state);
+    threading_plan_ = new_threading_plan;
+    worker_pool_ = std::move(new_worker_pool);
+    lifecycle_ = SessionLifecycle::Initialized;
+}
+
+Tensor InferenceSession::run(const Tensor& input) const{
+    return run_impl(input, nullptr);
+}
+
+Tensor InferenceSession::run(const Tensor& input, RunProfile& profile) const{
+    return run_impl(input, &profile);
+}
+
+Tensor InferenceSession::run_impl(const Tensor& input, RunProfile* profile) const{
+    std::unique_ptr<RunProfiler> profiler;
+
+    if(profile){
+        *profile = RunProfile{};
+    }
+
+    try{
+        require_initialized();
+
+        const SessionState& state = *session_state_;
+        const ExecutionPlan& execution_plan = state.execution_plan();
+
+        if(profile){
+            profiler = std::make_unique<RunProfiler>(execution_plan);
+        }
+
+        ExecutionFrame frame(state, profiler.get());
+        frame.bind_input(execution_plan.input_index(), input);
+
+        if(threading_plan_->effective_execution_mode() == ExecutionMode::Sequential){
+            SequentialExecutor executor(worker_pool_.get());
+            executor.execute(state, frame, profiler.get());
+        }else{
+            if(!worker_pool_){
+                throw std::logic_error("Parallel InferenceSession has no inter-op ThreadPool.");
+            }
+
+            ParallelExecutor executor(*worker_pool_);
+            executor.execute(state, frame, profiler.get());
+        }
+
+        Tensor output = frame.fetch(execution_plan.output_index());
+
+        if(profiler){
+            profiler->finish(true);
+            *profile = profiler->snapshot();
+        }
+
+        return output;
+    }catch(...){
+        if(profiler){
+            const std::string message = current_exception_message();
+
+            try{
+                profiler->finish(false, message);
+                *profile = profiler->snapshot();
+            }catch(...){
+                // Profiling must never replace the original runtime failure.
+            }
+        }else if(profile){
+            profile->error = current_exception_message();
+        }
+
+        throw;
+    }
+}
+
+SessionLifecycle InferenceSession::lifecycle() const noexcept{
+    return lifecycle_;
+}
+
+PassManager& InferenceSession::pass_manager(){
+    if(lifecycle_ == SessionLifecycle::Initialized){
+        throw std::logic_error("Graph passes must be registered before InferenceSession initialization.");
+    }
+
+    return pass_manager_;
+}
+
+KernelRegistry& InferenceSession::kernel_registry(){
+    if(lifecycle_ == SessionLifecycle::Initialized){
+        throw std::logic_error(
+            "Kernels must be registered before InferenceSession initialization."
+        );
+    }
+
+    return kernel_registry_;
+}
+
+const Graph& InferenceSession::graph() const{
+    if(session_state_){
+        return session_state_->graph();
+    }
+
+    if(loaded_graph_){
+        return *loaded_graph_;
+    }
+
+    throw std::logic_error("InferenceSession has no loaded Graph.");
+}
+
+const ExecutionPlan& InferenceSession::plan() const{
+    return session_state().execution_plan();
+}
+
+const SessionState& InferenceSession::session_state() const{
+    require_initialized();
+    return *session_state_;
+}
+
+const ThreadingPlan& InferenceSession::threading_plan() const{
+    require_initialized();
+    return *threading_plan_;
+}
+
+const ModelMetadata& InferenceSession::metadata() const{
+    if(!metadata_){
+        throw std::logic_error("InferenceSession was not loaded from a model package.");
+    }
+
+    return *metadata_;
+}
+
+void InferenceSession::require_initialized() const{
+    if(lifecycle_ != SessionLifecycle::Initialized || !session_state_ || !threading_plan_){
+        throw std::logic_error("InferenceSession is not initialized.");
+    }
+}
+
+}

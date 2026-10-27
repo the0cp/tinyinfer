@@ -1,13 +1,13 @@
-#include "execution_frame.h"
-#include "executor.h"
-#include "graph_optimizer.h"
-#include "inference_session.h"
-#include "kernel_registry.h"
-#include "model_loader.h"
-#include "operator_registry.h"
-#include "profiler.h"
-#include "session_state.h"
-#include "value_index.h"
+#include <tinyinfer/runtime/execution_frame.h>
+#include <tinyinfer/runtime/executor.h>
+#include <tinyinfer/graph/graph_optimizer.h>
+#include <tinyinfer/runtime/inference_session.h>
+#include <tinyinfer/runtime/kernel_registry.h>
+#include <tinyinfer/runtime/model_loader.h>
+#include <tinyinfer/graph/operator_registry.h>
+#include <tinyinfer/runtime/profiler.h>
+#include <tinyinfer/runtime/session_state.h>
+#include <tinyinfer/graph/value_index.h>
 
 #include <algorithm>
 #include <atomic>

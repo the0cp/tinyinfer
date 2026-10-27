@@ -1,12 +1,11 @@
-#include "executor.h"
-#include "kernel_registry.h"
-#include "model_loader.h"
-#include "module.h"
-#include "op_kernel.h"
-#include "operator_registry.h"
-#include "ops.h"
-#include "session_state.h"
-#include "thread_pool.h"
+#include <tinyinfer/runtime/executor.h>
+#include <tinyinfer/runtime/kernel_registry.h>
+#include <tinyinfer/runtime/model_loader.h>
+#include <tinyinfer/runtime/op_kernel.h>
+#include <tinyinfer/graph/operator_registry.h>
+#include <tinyinfer/compute/ops.h>
+#include <tinyinfer/runtime/session_state.h>
+#include <tinyinfer/core/thread_pool.h>
 
 #include <atomic>
 #include <chrono>
@@ -174,7 +173,7 @@ void test_matmul_implementations(){
     expect(threadpool_matmul(zero_rows, b, pool, 2).shape() == Shape({0, 2}), "zero rows");
 }
 
-void test_linear_softmax_and_sequential(){
+void test_linear_and_softmax(){
     Tensor input({1, 2}, {1.0f, 2.0f});
     Tensor weight({2, 3}, {1, 0, -1, 0, 1, 1});
     Tensor bias({3}, {0, 0, 0});
@@ -190,13 +189,6 @@ void test_linear_softmax_and_sequential(){
     expect(probabilities.data()[1] > probabilities.data()[0], "softmax ordering");
     expect_throw([](){ (void)softmax(Tensor({2, 0})); }, "non-empty");
 
-    Sequential model;
-    model.add(std::make_unique<Linear>(weight, bias));
-    model.add(std::make_unique<ReLU>());
-    model.add(std::make_unique<Softmax>());
-    expect(model.size() == 3, "Sequential size");
-    Tensor result = model.forward(input);
-    expect_close(result.data()[0] + result.data()[1] + result.data()[2], 1.0f);
 }
 
 void test_bfloat16_weight_ops(){
@@ -554,7 +546,7 @@ int main(){
         {"tensor_basics", test_tensor_basics},
         {"add_relu_and_transpose", test_add_relu_and_transpose},
         {"matmul_implementations", test_matmul_implementations},
-        {"linear_softmax_and_sequential", test_linear_softmax_and_sequential},
+        {"linear_and_softmax", test_linear_and_softmax},
         {"bfloat16_weight_ops", test_bfloat16_weight_ops},
         {"operator_registry_schema_only", test_operator_registry_schema_only},
         {"kernel_registry", test_kernel_registry},

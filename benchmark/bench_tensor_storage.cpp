@@ -1,4 +1,4 @@
-#include "tensor.h"
+#include <tinyinfer/core/tensor.h>
 
 #include <algorithm>
 #include <chrono>
