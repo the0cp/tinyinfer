@@ -1,5 +1,6 @@
 #include "qwen_model.h"
 
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,19 @@ using namespace tinyinfer;
 void expect(bool condition, const std::string& message){
     if(!condition){
         throw std::runtime_error("EXPECT failed: " + message);
+    }
+}
+
+void expect_close(const Tensor& actual, const Tensor& expected, float tolerance = 1e-4f){
+    expect(actual.shape() == expected.shape(), "tensor shapes match");
+    for(size_t i = 0; i < actual.numel(); i++){
+        if(std::fabs(actual.data()[i] - expected.data()[i]) > tolerance){
+            throw std::runtime_error(
+                "EXPECT_CLOSE failed at " + std::to_string(i) +
+                ": actual=" + std::to_string(actual.data()[i]) +
+                ", expected=" + std::to_string(expected.data()[i])
+            );
+        }
     }
 }
 
@@ -198,11 +212,61 @@ void test_rejects_invalid_packages(){
     }
 }
 
+void test_decoder_prefill_decode_and_reset(){
+    const std::filesystem::path manifest = write_package("decoder", Mutation::None);
+    const Qwen2Model model = load_qwen2_model(manifest);
+    Qwen2Decoder decoder(model, 4);
+
+    expect(decoder.capacity_tokens() == 4, "decoder capacity");
+    expect(decoder.size_tokens() == 0, "new decoder cache is empty");
+    expect_throw([&](){ (void)decoder.decode(1); }, "prefill first");
+    expect_throw([&](){ (void)decoder.prefill({}); }, "at least one token");
+
+    const int64_t invalid[]{16};
+    expect_throw([&](){ (void)decoder.prefill(invalid); }, "out of range");
+    expect(decoder.size_tokens() == 0, "invalid token leaves cache empty");
+
+    const int64_t prompt[]{1, 2};
+    const Tensor prefill_logits = decoder.prefill(prompt);
+    expect(prefill_logits.shape() == Shape({1, 16}), "prefill logits shape");
+    expect(decoder.size_tokens() == 2, "prefill cache size");
+    expect_throw([&](){ (void)decoder.prefill(prompt); }, "empty KV cache");
+    expect(decoder.size_tokens() == 2, "repeated prefill leaves cache unchanged");
+
+    const Tensor cached_logits = decoder.decode(3);
+    expect(decoder.size_tokens() == 3, "decode cache size");
+
+    Qwen2Decoder full_recompute(model, 4);
+    const int64_t full_sequence[]{1, 2, 3};
+    const Tensor full_logits = full_recompute.prefill(full_sequence);
+    expect_close(cached_logits, full_logits);
+
+    decoder.reset();
+    expect(decoder.size_tokens() == 0, "reset clears every layer cache");
+    expect_close(decoder.prefill(prompt), prefill_logits);
+
+    std::filesystem::remove_all(manifest.parent_path());
+}
+
+void test_decoder_rejects_invalid_model_and_capacity(){
+    const std::filesystem::path manifest = write_package("decoder_invalid", Mutation::None);
+    Qwen2Model model = load_qwen2_model(manifest);
+
+    expect_throw([&](){ Qwen2Decoder decoder(model, 0); }, "capacity");
+    expect_throw([&](){ Qwen2Decoder decoder(model, 33); }, "model limit");
+
+    model.layers.clear();
+    expect_throw([&](){ Qwen2Decoder decoder(model, 4); }, "layer count");
+    std::filesystem::remove_all(manifest.parent_path());
+}
+
 }
 
 int main(){
     test_loads_valid_package();
     test_rejects_invalid_packages();
-    std::cout << "qwen model loader tests passed\n";
+    test_decoder_prefill_decode_and_reset();
+    test_decoder_rejects_invalid_model_and_capacity();
+    std::cout << "qwen model tests passed\n";
     return 0;
 }

@@ -219,6 +219,16 @@ void test_bfloat16_weight_ops(){
     const Tensor bias = bfloat16_tensor({3}, {0.5f, -0.5f, 1.0f});
     expect_tensor(linear(input, weight, bias), {1, 3}, {1.5f, 1.5f, 2.0f});
 
+    const Tensor transposed_weight = bfloat16_tensor(
+        {3, 2},
+        {1.0f, 0.0f, 0.0f, 1.0f, 1.0f, -1.0f}
+    );
+    expect_tensor(
+        matmul_transposed_b(input, transposed_weight),
+        {1, 3},
+        {1.0f, 2.0f, -1.0f}
+    );
+
     ThreadPool pool(2);
     Tensor threaded({2, 3});
     const Tensor two_rows({2, 2}, {1.0f, 2.0f, 1.0f, 2.0f});

@@ -2,6 +2,7 @@
 
 #include "buffer.h"
 #include "model_format.h"
+#include "ops.h"
 
 #include <algorithm>
 #include <bit>
@@ -475,6 +476,55 @@ std::shared_ptr<Buffer> load_weight_buffer(
     return buffer;
 }
 
+void require_execution_weight(
+    const Tensor& tensor,
+    const Shape& expected,
+    const char* name
+){
+    if(tensor.shape() != expected){
+        throw std::invalid_argument(std::string(name) + " shape mismatch.");
+    }
+
+    if(
+        (tensor.dtype() != DataType::Float32 &&
+         tensor.dtype() != DataType::BFloat16) ||
+        !tensor.is_contiguous()
+    ){
+        throw std::invalid_argument(
+            std::string(name) + " must be contiguous float32 or bfloat16."
+        );
+    }
+}
+
+void validate_execution_model(const Qwen2Model& model){
+    if(
+        model.config.vocab_size == 0 || model.config.num_layers == 0 ||
+        model.config.max_position_embeddings == 0
+    ){
+        throw std::invalid_argument("Qwen2 model dimensions must be positive.");
+    }
+
+    if(model.layers.size() != model.config.num_layers){
+        throw std::invalid_argument("Qwen2 model layer count mismatch.");
+    }
+
+    require_execution_weight(
+        model.token_embedding,
+        {model.config.vocab_size, model.config.block.hidden_size},
+        "Qwen2 token embedding"
+    );
+
+    require_execution_weight(
+        model.final_norm,
+        {model.config.block.hidden_size},
+        "Qwen2 final norm"
+    );
+
+    for(const DecoderBlockWeights& layer : model.layers){
+        validate_decoder_block(model.config.block, layer);
+    }
+}
+
 }
 
 Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
@@ -486,11 +536,8 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
     }
 
     QwenManifest manifest = parse_manifest(manifest_path);
-    if(manifest.config.num_layers > (std::numeric_limits<size_t>::max() - 2) / 12){
-        throw std::runtime_error("Qwen2 tensor count overflows size_t.");
-    }
-
-    const size_t expected_count = 2 + manifest.config.num_layers * 12;
+    const auto expected = expected_tensors(manifest.config);
+    const size_t expected_count = expected.size();
     if(manifest.tensors.size() < expected_count){
         throw std::runtime_error("Qwen2 package is missing tensor declarations.");
     }
@@ -499,7 +546,6 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
         throw std::runtime_error("Qwen2 package contains unexpected tensors.");
     }
 
-    const auto expected = expected_tensors(manifest.config);
     std::unordered_map<std::string, const TensorMetadata*> declared;
 
     for(const TensorMetadata& tensor : manifest.tensors){
@@ -585,7 +631,6 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
             tensor(layer_name(layer, "mlp.down_proj.weight"))
         };
 
-        validate_decoder_block(manifest.config.block, weights);
         layers.push_back(std::move(weights));
     }
 
@@ -598,6 +643,114 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
         std::move(layers),
         tensor("model.norm.weight")
     };
+}
+
+Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens)
+    : model_(std::move(model)), capacity_tokens_(max_tokens){
+    validate_execution_model(model_);
+    if(capacity_tokens_ == 0){
+        throw std::invalid_argument("Qwen2 decoder capacity must be positive.");
+    }
+
+    if(capacity_tokens_ > model_.config.max_position_embeddings){
+        throw std::invalid_argument("Qwen2 decoder capacity exceeds the model limit.");
+    }
+
+    const size_t head_dim = model_.config.block.hidden_size / model_.config.block.query_heads;
+    caches_.reserve(model_.config.num_layers);
+
+    for(size_t layer = 0; layer < model_.config.num_layers; layer++){
+        caches_.emplace_back(KvCacheConfig{
+            capacity_tokens_,
+            model_.config.block.kv_heads,
+            head_dim
+        });
+    }
+}
+
+Tensor Qwen2Decoder::last_token_logits(const Tensor& hidden_states) const{
+    const size_t hidden_size = model_.config.block.hidden_size;
+    Tensor last_hidden({1, hidden_size});
+
+    // Copy the last hidden state from the batch of hidden states 
+    // to a new tensor for normalization and projection.
+    std::copy_n(
+        hidden_states.data() + (hidden_states.shape()[0] - 1) * hidden_size,
+        hidden_size,
+        last_hidden.data()
+    );
+
+    const Tensor normalized = rms_norm(
+        last_hidden,
+        model_.final_norm,
+        model_.config.block.rms_norm_epsilon
+    );
+
+    // Tied LM head: project the normalized hidden state to the 
+    // vocabulary size using the token embedding weights
+    return matmul_transposed_b(normalized, model_.token_embedding);
+}
+
+Tensor Qwen2Decoder::prefill(std::span<const int64_t> token_ids){
+    if(token_ids.empty()){
+        throw std::invalid_argument("Qwen2 prefill requires at least one token.");
+    }
+
+    if(token_ids.size() > capacity_tokens_){
+        throw std::length_error("Qwen2 prefill exceeds decoder capacity.");
+    }
+
+    Tensor hidden_states = embedding(model_.token_embedding, token_ids);
+    for(size_t layer = 0; layer < model_.layers.size(); layer++){
+        hidden_states = decoder_block_prefill(
+            hidden_states,
+            model_.config.block,
+            model_.layers[layer],
+            caches_[layer]
+        );
+    }
+
+    return last_token_logits(hidden_states);
+}
+
+Tensor Qwen2Decoder::decode(int64_t token_id){
+    const size_t position = size_tokens();
+    if(position == 0){
+        throw std::logic_error("Qwen2 decode requires prefill first.");
+    }
+
+    if(position == capacity_tokens_){
+        throw std::length_error("Qwen2 decode exceeds decoder capacity.");
+    }
+
+    const int64_t token_ids[]{token_id};
+    Tensor hidden_state = embedding(model_.token_embedding, token_ids);
+
+    // Process the single token through each decoder block, updating the KV caches
+    for(size_t layer = 0; layer < model_.layers.size(); layer++){
+        hidden_state = decoder_block_decode(
+            hidden_state,
+            model_.config.block,
+            model_.layers[layer],
+            caches_[layer]
+        );
+    }
+
+    return last_token_logits(hidden_state);
+}
+
+void Qwen2Decoder::reset() noexcept{
+    for(ContiguousKvCache& cache : caches_){
+        cache.clear();
+    }
+}
+
+size_t Qwen2Decoder::size_tokens() const noexcept{
+    return caches_.front().size_tokens();
+}
+
+size_t Qwen2Decoder::capacity_tokens() const noexcept{
+    return capacity_tokens_;
 }
 
 }

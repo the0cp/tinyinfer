@@ -13,7 +13,7 @@ The repository currently provides a working minimal graph runtime, CPU Attention
 
 The Decoder Block implements biased Q/K/V projections, RMSNorm, half-split RoPE, Grouped-Query Attention (GQA), SwiGLU, and residual connections. It supports both prefill and cached single-token decode, with small synthetic tests validated against a Hugging Face Transformers reference implementation.
 
-The offline converter preserves the pinned checkpoint's BF16 weights while transposing Linear matrices into tinyinfer's layout. The 988,065,536-byte package is exactly half the previous FP32 payload. The C++ loader exposes all 290 tensors as views over one shared BF16 buffer; Embedding, Linear, and RMSNorm convert values during FP32 computation. A real Embedding → Layer 0 check still matches the float32 reference with maximum absolute error `7.35521e-05`. Full 24-layer logits, tokenization, and text generation are the next stage and are not yet claimed as complete.
+The offline converter preserves the pinned checkpoint's BF16 weights while transposing Linear matrices into tinyinfer's layout. The 988,065,536-byte package is exactly half the previous FP32 payload. The C++ loader exposes all 290 tensors as views over one shared BF16 buffer. `Qwen2Decoder` now runs Embedding → 24 Decoder Blocks → Final RMSNorm → tied LM Head with one KV cache per layer.
 
 ## Features
 
@@ -27,7 +27,7 @@ The offline converter preserves the pinned checkpoint's BF16 weights while trans
 | **Model loading & profiling** | Native manifest/binary-weight format, per-node timing, allocation tracking, and Chrome trace export. |
 | **Attention & KV cache**      | CPU causal MHA/GQA/MQA, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
 | **Decoder Block** | Causal decoder block with RMSNorm, biased QKV, half-split RoPE, GQA, SwiGLU, residual connections, and prefill/decode support. |
-| **Qwen2 model boundary** | Pinned offline converter, checked BF16 weight views, FP32 accumulation, and a real Layer 0 numerical integration check. |
+| **Qwen2 model path** | Checked BF16 weight views, full 24-layer prefill/decode, per-layer KV state, tied LM Head, and real-logit validation. |
 
 The execution pipeline is:
 

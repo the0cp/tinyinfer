@@ -10,8 +10,9 @@ namespace tinyinfer{
 
 // *_out contract: contiguous float32 activations/output, exact output shape,
 // and non-overlapping byte ranges (disjoint views of one Buffer are OK).
-// Embedding, Linear and RMSNorm also accept immutable bfloat16 weights while
-// accumulating and producing float32. Validation finishes before output writes.
+// Embedding, Linear, RMSNorm and matmul_transposed_b also accept immutable
+// bfloat16 weights while accumulating and producing float32. Validation finishes
+// before output writes.
 Tensor add(const Tensor& a, const Tensor& b);
 void add_out(const Tensor& a, const Tensor& b, Tensor& out);
 Tensor transpose_2d(const Tensor& x);

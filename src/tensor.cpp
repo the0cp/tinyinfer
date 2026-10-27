@@ -219,26 +219,18 @@ const std::byte* Tensor::byte_ptr(size_t element_offset) const{
     return bytes + byte_offset_ + element_offset * element_size(dtype_);
 }
 
-float* Tensor::element_ptr(size_t element_offset){
-    if(dtype_ != DataType::Float32){
-        throw std::logic_error("Float access requires a float32 tensor.");
-    }
-    return reinterpret_cast<float*>(byte_ptr(element_offset));
-}
-
-const float* Tensor::element_ptr(size_t element_offset) const{
-    if(dtype_ != DataType::Float32){
-        throw std::logic_error("Float access requires a float32 tensor.");
-    }
-    return reinterpret_cast<const float*>(byte_ptr(element_offset));
-}
-
 float& Tensor::at(std::initializer_list<size_t> indices){
-    return *element_ptr(compute_offset(indices));
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Float access requires a float32 tensor.");
+    }
+    return *reinterpret_cast<float*>(byte_ptr(compute_offset(indices)));
 }
 
 const float& Tensor::at(std::initializer_list<size_t> indices) const{
-    return *element_ptr(compute_offset(indices));
+    if(dtype_ != DataType::Float32){
+        throw std::logic_error("Float access requires a float32 tensor.");
+    }
+    return *reinterpret_cast<const float*>(byte_ptr(compute_offset(indices)));
 }
 
 float* Tensor::data(){
@@ -253,7 +245,7 @@ float* Tensor::data(){
         throw std::logic_error("Tensor::data() requires a contiguous tensor.");
     }
 
-    return element_ptr(0);
+    return reinterpret_cast<float*>(byte_ptr(0));
 }
 
 const float* Tensor::data() const{
@@ -268,7 +260,7 @@ const float* Tensor::data() const{
         throw std::logic_error("Tensor::data() requires a contiguous tensor.");
     }
 
-    return element_ptr(0);
+    return reinterpret_cast<const float*>(byte_ptr(0));
 }
 
 BFloat16* Tensor::bfloat16_data(){
@@ -401,7 +393,7 @@ void Tensor::fill(float value){
             return;
         }
         for(size_t linear = 0; linear < count; linear++){
-            *element_ptr(linear_offset(linear)) = value;
+            *reinterpret_cast<float*>(byte_ptr(linear_offset(linear))) = value;
         }
         return;
     }

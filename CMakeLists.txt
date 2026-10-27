@@ -110,6 +110,9 @@ target_link_libraries(runtime_demo PRIVATE tinyinfer)
 add_executable(check_qwen_layer0 tools/check_qwen_layer0.cpp)
 target_link_libraries(check_qwen_layer0 PRIVATE tinyinfer)
 
+add_executable(check_qwen_model tools/check_qwen_model.cpp)
+target_link_libraries(check_qwen_model PRIVATE tinyinfer)
+
 foreach(benchmark_name IN ITEMS
     matmul
     graph_scheduler

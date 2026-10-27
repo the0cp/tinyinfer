@@ -80,8 +80,6 @@ private:
     void validate_layout() const;
     std::byte* byte_ptr(size_t element_offset);
     const std::byte* byte_ptr(size_t element_offset) const;
-    float* element_ptr(size_t element_offset);
-    const float* element_ptr(size_t element_offset) const;
 };
 
 }

@@ -46,14 +46,18 @@ void require_disjoint_storage(
     }
 }
 
-void require_disjoint_input(const Tensor& input, const Tensor& out, const char* operation){
+void require_input(const Tensor& input, const char* operation){
     if(input.dtype() != DataType::Float32 || !input.is_contiguous()){
         throw std::runtime_error(std::string(operation) + " requires contiguous float32 input.");
     }
+}
+
+void require_disjoint_input(const Tensor& input, const Tensor& out, const char* operation){
+    require_input(input, operation);
     require_disjoint_storage(input, out, operation);
 }
 
-void require_weight(const Tensor& weight, const Tensor& out, const char* operation){
+void require_weight(const Tensor& weight, const char* operation){
     if(
         (weight.dtype() != DataType::Float32 &&
          weight.dtype() != DataType::BFloat16) ||
@@ -63,6 +67,10 @@ void require_weight(const Tensor& weight, const Tensor& out, const char* operati
             std::string(operation) + " requires contiguous float32 or bfloat16 weights."
         );
     }
+}
+
+void require_disjoint_weight(const Tensor& weight, const Tensor& out, const char* operation){
+    require_weight(weight, operation);
     require_disjoint_storage(weight, out, operation);
 }
 
@@ -103,9 +111,9 @@ LinearDimensions prepare_linear(
 
     require_output(out, Shape{dimensions.batch, dimensions.output_features}, "linear");
     require_disjoint_input(x, out, "linear");
-    require_weight(weight, out, "linear");
+    require_disjoint_weight(weight, out, "linear");
     if(bias != nullptr){
-        require_weight(*bias, out, "linear");
+        require_disjoint_weight(*bias, out, "linear");
     }
     return dimensions;
 }
@@ -169,6 +177,32 @@ void accumulate_linear_rows(
             for(size_t column = 0; column < dimensions.output_features; column++){
                 out_row[column] += x_value * as_float(weight_row[column]);
             }
+        }
+    }
+}
+
+template<typename Weight>
+void compute_matmul_transposed_b(
+    const float* input,
+    const Weight* weight,
+    float* output,
+    size_t rows,
+    size_t output_features,
+    size_t input_features
+){
+    for(size_t row = 0; row < rows; row++){
+        const float* input_row = input + row * input_features;
+        float* output_row = output + row * output_features;
+
+        for(size_t feature = 0; feature < output_features; feature++){
+            const Weight* weight_row = weight + feature * input_features;
+            float sum = 0.0f;
+
+            for(size_t inner = 0; inner < input_features; inner++){
+                sum += input_row[inner] * as_float(weight_row[inner]);
+            }
+
+            output_row[feature] = sum;
         }
     }
 }
@@ -395,20 +429,17 @@ Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt){
     }
 
     Tensor out({m, n});
+    require_input(a, "matmul_transposed_b");
+    require_weight(bt, "matmul_transposed_b");
 
-    for(size_t i = 0; i < m; i++){
-        const float* a_row = a.data() + i * k;
-
-        for(size_t j = 0; j < n; j++){
-            const float* bt_row = bt.data() + j * k;
-            float sum = 0.0f;
-
-            for(size_t p = 0; p < k; p++){
-                sum += a_row[p] * bt_row[p];
-            }
-
-            out.data()[i * n + j] = sum;
-        }
+    if(bt.dtype() == DataType::Float32){
+        compute_matmul_transposed_b(
+            a.data(), bt.data(), out.data(), m, n, k
+        );
+    }else{
+        compute_matmul_transposed_b(
+            a.data(), bt.bfloat16_data(), out.data(), m, n, k
+        );
     }
 
     return out;
@@ -558,7 +589,7 @@ void embedding_out(
     }
 
     require_output(out, {token_ids.size(), hidden_size}, "embedding");
-    require_weight(weight, out, "embedding");
+    require_disjoint_weight(weight, out, "embedding");
 
     if(weight.dtype() == DataType::Float32){
         for(size_t token = 0; token < token_ids.size(); token++){
@@ -725,7 +756,7 @@ void rms_norm_out(
 
     require_output(out, x.shape(), "rms_norm");
     require_disjoint_input(x, out, "rms_norm");
-    require_weight(weight, out, "rms_norm");
+    require_disjoint_weight(weight, out, "rms_norm");
 
     const size_t rows = x.numel() / features;
 

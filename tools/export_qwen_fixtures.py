@@ -364,6 +364,30 @@ def write_fixtures(
         stream.write(input_ids.tobytes(order="C"))
         stream.write(layer0_output.tobytes(order="C"))
 
+    logit_names = ["prefill_last_logits"] + [
+        f"decode_{step}_logits" for step in range(1, len(generated))
+    ]
+    logits = [arrays[name].astype("<f4", copy=False) for name in logit_names]
+    vocab_size = int(config["vocab_size"])
+    if not generated or any(array.shape != (vocab_size,) for array in logits):
+        raise ValueError("model case logits do not match generation metadata")
+    model_case_path = output_dir / "model_case.bin"
+    with model_case_path.open("wb") as stream:
+        stream.write(
+            struct.pack(
+                "<8sIIII",
+                b"TIQMC001",
+                1,
+                input_ids.size,
+                vocab_size,
+                len(generated),
+            )
+        )
+        stream.write(input_ids.tobytes(order="C"))
+        stream.write(np.asarray(generated, dtype="<i8").tobytes(order="C"))
+        for array in logits:
+            stream.write(array.tobytes(order="C"))
+
     manifest = {
         "format": "tinyinfer_qwen_fixture",
         "version": 1,
@@ -401,6 +425,13 @@ def write_fixtures(
             "tokens": tokens,
             "hidden_size": hidden,
             "sha256": sha256_file(layer0_case_path),
+        },
+        "model_case": {
+            "file": model_case_path.name,
+            "prompt_tokens": int(input_ids.size),
+            "vocab_size": vocab_size,
+            "steps": len(generated),
+            "sha256": sha256_file(model_case_path),
         },
         "arrays": entries,
     }
