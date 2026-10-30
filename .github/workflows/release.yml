@@ -1,0 +1,56 @@
+name: Linux release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build-release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-release --parallel
+
+      - name: Test
+        run: ctest --test-dir build-release --output-on-failure
+
+      - name: Package
+        run: |
+          mkdir -p tinyinfer-linux-x86_64
+          install -m 755 build-release/runtime_demo tinyinfer-linux-x86_64/
+          install -m 755 build-release/graph_model_demo tinyinfer-linux-x86_64/
+          install -m 755 build-release/check_qwen_layer0 tinyinfer-linux-x86_64/
+          install -m 755 build-release/check_qwen_model tinyinfer-linux-x86_64/
+          install -m 644 README.md tinyinfer-linux-x86_64/
+          tar -czf tinyinfer-linux-x86_64.tar.gz tinyinfer-linux-x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tinyinfer-linux-x86_64
+          path: tinyinfer-linux-x86_64.tar.gz
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" || \
+            gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            tinyinfer-linux-x86_64.tar.gz --clobber

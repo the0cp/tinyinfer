@@ -59,4 +59,11 @@ private:
     size_t capacity_tokens_;
 };
 
+std::vector<int64_t> greedy_generate(
+    Qwen2Decoder& decoder,
+    std::span<const int64_t> prompt,
+    size_t max_new_tokens,
+    int64_t eos_token_id
+);
+
 }

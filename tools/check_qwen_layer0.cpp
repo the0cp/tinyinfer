@@ -90,13 +90,20 @@ void check_close(const tinyinfer::Tensor& actual, const std::vector<float>& expe
     constexpr float relative_tolerance = 1e-4f;
     float maximum_error = 0.0f;
     for(size_t i = 0; i < expected.size(); i++){
-        const float error = std::fabs(actual.data()[i] - expected[i]);
-        const float allowed = absolute_tolerance + relative_tolerance * std::fabs(expected[i]);
-        if(!std::isfinite(actual.data()[i]) || error > allowed){
+        const float actual_value = actual.data()[i];
+        const float expected_value = expected[i];
+        const float error = std::fabs(actual_value - expected_value);
+        const float allowed = absolute_tolerance +
+            relative_tolerance * std::fabs(expected_value);
+        if(
+            !std::isfinite(actual_value) ||
+            !std::isfinite(expected_value) ||
+            error > allowed
+        ){
             throw std::runtime_error(
                 "Layer0 mismatch at element " + std::to_string(i) +
-                ": actual=" + std::to_string(actual.data()[i]) +
-                ", expected=" + std::to_string(expected[i])
+                ": actual=" + std::to_string(actual_value) +
+                ", expected=" + std::to_string(expected_value)
             );
         }
         maximum_error = std::max(maximum_error, error);

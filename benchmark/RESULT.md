@@ -103,7 +103,11 @@ done
 For memory-safety validation:
 
 ```bash
-cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DTINYINFER_ENABLE_ASAN_UBSAN=ON
-cmake --build build-asan --parallel
-ctest --test-dir build-asan --output-on-failure
+cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-debug --parallel
+ctest --test-dir build-debug --output-on-failure
+
+cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=ThreadSanitizer
+cmake --build build-tsan --parallel
+ctest --test-dir build-tsan --output-on-failure
 ```

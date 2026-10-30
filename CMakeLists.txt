@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
 
 project(tinyinfer LANGUAGES CXX)
 
@@ -7,32 +7,42 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(TINYINFER_ENABLE_ASAN_UBSAN "Build tinyinfer with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(TINYINFER_ENABLE_TSAN "Build tinyinfer with ThreadSanitizer" OFF)
-
-if(TINYINFER_ENABLE_ASAN_UBSAN AND TINYINFER_ENABLE_TSAN)
-    message(FATAL_ERROR "ASan/UBSan and TSan must be built separately.")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
-if(TINYINFER_ENABLE_ASAN_UBSAN)
-    if(MSVC)
-        message(FATAL_ERROR "This ASan/UBSan configuration is not supported on MSVC.")
-    endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
-if(TINYINFER_ENABLE_TSAN)
-    if(MSVC)
-        message(FATAL_ERROR "ThreadSanitizer is not supported by this CMake configuration on MSVC.")
+if(CMAKE_BUILD_TYPE STREQUAL "ThreadSanitizer")
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR "The ThreadSanitizer build requires GCC or Clang.")
     endif()
-    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g -O1)
     add_link_options(-fsanitize=thread)
 endif()
 
 find_package(Threads REQUIRED)
 
 add_library(tinyinfer)
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tokenizers-cpp/CMakeLists.txt")
+    message(FATAL_ERROR
+        "tokenizers-cpp is missing. Run: git submodule update --init --recursive"
+    )
+endif()
+find_program(
+    CARGO_EXECUTABLE cargo
+    HINTS
+        "$ENV{USERPROFILE}/.cargo/bin"
+        "$ENV{HOME}/.cargo/bin"
+)
+if(NOT CARGO_EXECUTABLE)
+    message(FATAL_ERROR "Cargo is required. Install Rust with rustup and reconfigure.")
+endif()
+add_subdirectory(third_party/tokenizers-cpp tokenizers EXCLUDE_FROM_ALL)
+add_library(tinyinfer_tokenizer src/llm/qwen2_tokenizer.cpp)
 add_subdirectory(src)
 
 target_include_directories(tinyinfer PUBLIC include)
@@ -42,6 +52,17 @@ if(MSVC)
     target_compile_options(tinyinfer PRIVATE /W4)
 else()
     target_compile_options(tinyinfer PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+endif()
+
+target_include_directories(tinyinfer_tokenizer PUBLIC include)
+target_link_libraries(tinyinfer_tokenizer PUBLIC tinyinfer PRIVATE tokenizers_cpp)
+if(MSVC)
+    target_compile_options(tinyinfer_tokenizer PRIVATE /W4)
+else()
+    target_compile_options(
+        tinyinfer_tokenizer PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+    )
 endif()
 
 enable_testing()
@@ -61,6 +82,14 @@ foreach(test_name IN ITEMS
     target_link_libraries(test_${test_name} PRIVATE tinyinfer)
     add_test(NAME test_${test_name} COMMAND test_${test_name})
 endforeach()
+
+add_executable(test_qwen_tokenizer tests/test_qwen_tokenizer.cpp)
+target_compile_definitions(
+    test_qwen_tokenizer PRIVATE
+    TINYINFER_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
+)
+target_link_libraries(test_qwen_tokenizer PRIVATE tinyinfer_tokenizer)
+add_test(NAME test_qwen_tokenizer COMMAND test_qwen_tokenizer)
 
 add_executable(legacy_mlp_demo examples/legacy_mlp_demo.cpp)
 target_link_libraries(legacy_mlp_demo PRIVATE tinyinfer)
@@ -84,7 +113,7 @@ add_executable(check_qwen_layer0 tools/check_qwen_layer0.cpp)
 target_link_libraries(check_qwen_layer0 PRIVATE tinyinfer)
 
 add_executable(check_qwen_model tools/check_qwen_model.cpp)
-target_link_libraries(check_qwen_model PRIVATE tinyinfer)
+target_link_libraries(check_qwen_model PRIVATE tinyinfer_tokenizer)
 
 foreach(benchmark_name IN ITEMS
     matmul

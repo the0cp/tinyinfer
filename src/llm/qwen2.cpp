@@ -760,4 +760,47 @@ size_t Qwen2Decoder::capacity_tokens() const noexcept{
     return capacity_tokens_;
 }
 
+std::vector<int64_t> greedy_generate(
+    Qwen2Decoder& decoder,
+    std::span<const int64_t> prompt,
+    size_t max_new_tokens,
+    int64_t eos_token_id
+){
+    if(prompt.empty()){
+        throw std::invalid_argument("Qwen2 generation requires a prompt.");
+    }
+
+    const size_t cached_generated_tokens = max_new_tokens == 0 ? 0 : max_new_tokens - 1;
+
+    if(prompt.size() > decoder.capacity_tokens() ||
+        cached_generated_tokens > decoder.capacity_tokens() - prompt.size()
+    ){
+        throw std::length_error("Qwen2 generation exceeds decoder capacity.");
+    }
+
+    decoder.reset();
+
+    if(max_new_tokens == 0){
+        return {};
+    }
+
+    Tensor logits = decoder.prefill(prompt);
+    std::vector<int64_t> generated;
+    generated.reserve(max_new_tokens);
+
+    for(size_t step = 0; step < max_new_tokens; step++){
+        const float* begin = logits.data();
+        const int64_t token = static_cast<int64_t>(std::max_element(begin, begin + logits.numel()) - begin);
+
+        generated.push_back(token);
+
+        if(token == eos_token_id || step + 1 == max_new_tokens){
+            break;
+        }
+
+        logits = decoder.decode(token);
+    }
+    return generated;
+}
+
 }

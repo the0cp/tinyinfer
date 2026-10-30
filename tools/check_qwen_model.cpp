@@ -1,4 +1,5 @@
 #include <tinyinfer/llm/qwen2.h>
+#include <tinyinfer/llm/qwen2_tokenizer.h>
 
 #include <algorithm>
 #include <bit>
@@ -134,15 +135,21 @@ void check_logits(
     float maximum_error = 0.0f;
     double error_sum = 0.0;
     for(size_t token = 0; token < vocab_size; token++){
-        const float error = std::fabs(actual.data()[token] - expected[token]);
+        const float actual_value = actual.data()[token];
+        const float expected_value = expected[token];
+        const float error = std::fabs(actual_value - expected_value);
         const float allowed = absolute_tolerance +
-            relative_tolerance * std::fabs(expected[token]);
-        if(!std::isfinite(actual.data()[token]) || error > allowed){
+            relative_tolerance * std::fabs(expected_value);
+        if(
+            !std::isfinite(actual_value) ||
+            !std::isfinite(expected_value) ||
+            error > allowed
+        ){
             throw std::runtime_error(
                 "Logit mismatch at step " + std::to_string(step) +
                 ", token " + std::to_string(token) +
-                ": actual=" + std::to_string(actual.data()[token]) +
-                ", expected=" + std::to_string(expected[token]) +
+                ": actual=" + std::to_string(actual_value) +
+                ", expected=" + std::to_string(expected_value) +
                 ", allowed=" + std::to_string(allowed)
             );
         }
@@ -165,21 +172,55 @@ int64_t argmax(const tinyinfer::Tensor& logits){
 }
 
 int main(int argc, char** argv){
-    if(argc != 3){
-        std::cerr << "usage: check_qwen_model <model.tiq> <model_case.bin>\n";
+    if(argc != 4){
+        std::cerr
+            << "usage: check_qwen_model <model.tiq> <tokenizer.json> <model_case.bin>\n";
         return 2;
     }
 
     try{
-        const ModelCase test = load_case(argv[2]);
+        const ModelCase test = load_case(argv[3]);
+        const tinyinfer::Qwen2Tokenizer tokenizer =
+            tinyinfer::load_qwen2_tokenizer(argv[2]);
+        if(
+            tokenizer.encode("Hello, TinyInfer!") !=
+            std::vector<int64_t>({9707, 11, 47974, 641, 802, 0})
+        ){
+            throw std::runtime_error("Qwen2 ASCII token ids do not match the reference.");
+        }
+        if(
+            tokenizer.encode("a23.''-Z'cc.43") !=
+            std::vector<int64_t>({64, 17, 18, 3159, 24293, 57, 6, 638, 13, 19, 18}) ||
+            tokenizer.encode("  hello") != std::vector<int64_t>({220, 23811})
+        ){
+            throw std::runtime_error("Qwen2 split boundaries do not match the reference.");
+        }
+        const std::vector<int64_t> utf8_tokens{
+            108386, 3837, 82707, 84238, 241, 24360, 102021, 11319
+        };
+        if(
+            tokenizer.encode("你好，KV 缓存是什么？") != utf8_tokens ||
+            tokenizer.decode(utf8_tokens) != "你好，KV 缓存是什么？"
+        ){
+            throw std::runtime_error("Qwen2 UTF-8 tokenizer case does not match the reference.");
+        }
+        const std::string prompt_text = tinyinfer::qwen2_chat_prompt(
+            "You are a concise inference systems tutor.",
+            "用一句话解释 KV cache。"
+        );
+        const std::vector<int64_t> prompt = tokenizer.encode(prompt_text);
+        if(prompt != test.prompt){
+            throw std::runtime_error("Qwen2 tokenizer prompt ids do not match the reference.");
+        }
+
         tinyinfer::Qwen2Model model = tinyinfer::load_qwen2_model(argv[1]);
         if(model.config.vocab_size != test.vocab_size){
             throw std::runtime_error("Model case vocabulary does not match the model.");
         }
 
-        const size_t capacity = test.prompt.size() + test.generated.size();
+        const size_t capacity = prompt.size() + test.generated.size() - 1;
         tinyinfer::Qwen2Decoder decoder(std::move(model), capacity);
-        tinyinfer::Tensor logits = decoder.prefill(test.prompt);
+        tinyinfer::Tensor logits = decoder.prefill(prompt);
 
         for(size_t step = 0; step < test.generated.size(); step++){
             const float* expected = test.logits.data() + step * test.vocab_size;
@@ -200,7 +241,13 @@ int main(int argc, char** argv){
             }
         }
 
-        std::cout << "real Qwen2 prefill and cached decode match the reference\n";
+        const std::string generated_text = tokenizer.decode(test.generated, true);
+        if(generated_text != "KV cache，"){
+            throw std::runtime_error("Qwen2 decoded text does not match the reference.");
+        }
+
+        std::cout << "generated_text=" << generated_text << "\n"
+                  << "real Qwen2 text generation matches the reference\n";
         return 0;
     }catch(const std::exception& error){
         std::cerr << error.what() << "\n";

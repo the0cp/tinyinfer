@@ -213,6 +213,8 @@ def export_token_cases(tokenizer: Any) -> tuple[list[dict[str, Any]], torch.Tens
     cases = [
         ("plain_ascii", "Hello, TinyInfer!"),
         ("plain_utf8", "你好，KV 缓存是什么？"),
+        ("mixed_boundaries", "a23.''-Z'cc.43"),
+        ("leading_whitespace", "  hello"),
         ("chat", chat_text),
     ]
 

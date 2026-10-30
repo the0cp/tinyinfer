@@ -5,15 +5,14 @@
 tinyinfer is one small inference engine with two execution scenarios:
 
 - **Graph inference** compiles a static graph into an execution and memory plan.
-- **Generative inference** will run a stateful Transformer decoder with prefill, decode, and KV caching.
+- **Generative inference** runs a stateful Transformer decoder with tokenization, prefill, decode, and KV caching.
 
 Both paths share the same Tensor/Buffer representation, CPU primitives, threading foundation, and measurement conventions. The decoder is not required to masquerade as a static graph: stateful generation may use a direct loop when that is clearer.
 
-The repository currently provides a working minimal graph runtime, CPU Attention and KV-cache implementations, a causal Decoder Block, and a checked native loader for the pinned Qwen2.5-0.5B-Instruct checkpoint.
 
 The Decoder Block implements biased Q/K/V projections, RMSNorm, half-split RoPE, Grouped-Query Attention (GQA), SwiGLU, and residual connections. It supports both prefill and cached single-token decode, with small synthetic tests validated against a Hugging Face Transformers reference implementation.
 
-The offline converter preserves the pinned checkpoint's BF16 weights while transposing Linear matrices into tinyinfer's layout. The 988,065,536-byte package is exactly half the previous FP32 payload. The C++ loader exposes all 290 tensors as views over one shared BF16 buffer. `Qwen2Decoder` now runs Embedding → 24 Decoder Blocks → Final RMSNorm → tied LM Head with one KV cache per layer.
+The offline converter preserves the pinned checkpoint's BF16 weights while transposing Linear matrices into tinyinfer's layout. The 988,065,536-byte package is exactly half the previous FP32 payload. The original Hugging Face `tokenizer.json` is consumed by the pinned [`mlc-ai/tokenizers-cpp`](https://github.com/mlc-ai/tokenizers-cpp) submodule. `Qwen2Decoder` runs Embedding → 24 Decoder Blocks → Final RMSNorm → tied LM Head with one KV cache per layer; the fixed chat formatter and greedy loop produce reference-matching text.
 
 ## Features
 
@@ -27,7 +26,7 @@ The offline converter preserves the pinned checkpoint's BF16 weights while trans
 | **Model loading & profiling** | Native manifest/binary-weight format, per-node timing, allocation tracking, and Chrome trace export. |
 | **Attention & KV cache**      | CPU causal MHA/GQA/MQA, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
 | **Decoder Block** | Causal decoder block with RMSNorm, biased QKV, half-split RoPE, GQA, SwiGLU, residual connections, and prefill/decode support. |
-| **Qwen2 model path** | Checked BF16 weight views, full 24-layer prefill/decode, per-layer KV state, tied LM Head, and real-logit validation. |
+| **Qwen2 model path** | Hugging Face `tokenizer.json`, fixed chat formatting, checked BF16 weights, full 24-layer prefill/decode, greedy EOS stopping, and real text/logit validation. |
 
 The execution pipeline is:
 
@@ -50,22 +49,44 @@ tinyinfer CLI
 
 ## Build and test
 
+### Full build from source
+
+The full text-generation build needs CMake 3.19+, a C++20 compiler, Git, and a Rust toolchain with Cargo.
+
+Fedora is the reference development and benchmark environment:
 
 ```bash
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+sudo dnf install cmake ninja-build gcc-c++ git rust cargo
+git clone --recurse-submodules https://github.com/the0cp/tinyinfer
+cd tinyinfer
+cmake -S . -B build-release -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release --parallel
 ctest --test-dir build-release --output-on-failure
-
-./build-release/runtime_demo
-./build-release/bench_paged_kv_cache
 ```
 
-AddressSanitizer and UndefinedBehaviorSanitizer can be enabled with GCC/Clang:
+On Fedora under WSL, install the native build tools and Rust with rustup:
 
 ```bash
-cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DTINYINFER_ENABLE_ASAN_UBSAN=ON
-cmake --build build-asan --parallel
-ctest --test-dir build-asan --output-on-failure
+sudo dnf install -y gcc-c++ cmake ninja-build git curl pkgconf-pkg-config
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+
+git clone --recurse-submodules https://github.com/the0cp/tinyinfer.git
+cd tinyinfer
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+Debug builds enable AddressSanitizer and UndefinedBehaviorSanitizer automatically
+with GCC or Clang. ThreadSanitizer requires a separate build because it cannot be
+combined with AddressSanitizer:
+
+```bash
+cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=ThreadSanitizer
+cmake --build build-tsan --parallel
+ctest --test-dir build-tsan --output-on-failure
 ```
 
 ## Tests and benchmarks

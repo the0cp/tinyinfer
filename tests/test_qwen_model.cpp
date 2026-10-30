@@ -1,10 +1,12 @@
 #include <tinyinfer/llm/qwen2.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -22,11 +24,17 @@ void expect(bool condition, const std::string& message){
 void expect_close(const Tensor& actual, const Tensor& expected, float tolerance = 1e-4f){
     expect(actual.shape() == expected.shape(), "tensor shapes match");
     for(size_t i = 0; i < actual.numel(); i++){
-        if(std::fabs(actual.data()[i] - expected.data()[i]) > tolerance){
+        const float actual_value = actual.data()[i];
+        const float expected_value = expected.data()[i];
+        if(
+            !std::isfinite(actual_value) ||
+            !std::isfinite(expected_value) ||
+            std::fabs(actual_value - expected_value) > tolerance
+        ){
             throw std::runtime_error(
                 "EXPECT_CLOSE failed at " + std::to_string(i) +
-                ": actual=" + std::to_string(actual.data()[i]) +
-                ", expected=" + std::to_string(expected.data()[i])
+                ": actual=" + std::to_string(actual_value) +
+                ", expected=" + std::to_string(expected_value)
             );
         }
     }
@@ -44,6 +52,22 @@ void expect_throw(Function&& function, const std::string& needle){
         return;
     }
     throw std::runtime_error("Expected exception containing: " + needle);
+}
+
+void test_expect_close_rejects_non_finite(){
+    Tensor finite({1});
+    Tensor non_finite({1});
+    finite.data()[0] = 0.0f;
+    non_finite.data()[0] = std::numeric_limits<float>::quiet_NaN();
+
+    expect_throw(
+        [&](){ expect_close(non_finite, finite); },
+        "EXPECT_CLOSE failed"
+    );
+    expect_throw(
+        [&](){ expect_close(finite, non_finite); },
+        "EXPECT_CLOSE failed"
+    );
 }
 
 struct Spec{
@@ -260,13 +284,65 @@ void test_decoder_rejects_invalid_model_and_capacity(){
     std::filesystem::remove_all(manifest.parent_path());
 }
 
+void test_greedy_generation_stops_and_resets(){
+    const std::filesystem::path manifest = write_package("generation", Mutation::None);
+    const Qwen2Model model = load_qwen2_model(manifest);
+    const int64_t prompt[]{1, 2};
+
+    Qwen2Decoder oracle(model, 4);
+    const Tensor first_logits = oracle.prefill(prompt);
+    const int64_t first_token = static_cast<int64_t>(
+        std::max_element(
+            first_logits.data(),
+            first_logits.data() + first_logits.numel()
+        ) - first_logits.data()
+    );
+
+    Qwen2Decoder decoder(model, 4);
+    expect(
+        greedy_generate(decoder, prompt, 2, first_token) ==
+            std::vector<int64_t>({first_token}),
+        "EOS stops greedy generation"
+    );
+    expect(decoder.size_tokens() == 2, "stopped token is not decoded into cache");
+
+    const std::vector<int64_t> generated = greedy_generate(decoder, prompt, 2, -1);
+    expect(generated.size() == 2, "maximum token count stops generation");
+    expect(generated.front() == first_token, "generation resets request state");
+    expect(decoder.size_tokens() == 3, "only tokens needed by the next step enter cache");
+
+    expect(
+        greedy_generate(decoder, prompt, 3, -1).size() == 3,
+        "the final generated token needs no cache slot"
+    );
+    expect(decoder.size_tokens() == 4, "generation uses exactly prompt plus N-1 slots");
+
+    expect_throw(
+        [&](){ (void)greedy_generate(decoder, prompt, 4, -1); },
+        "capacity"
+    );
+    expect(decoder.size_tokens() == 4, "invalid request is rejected before reset");
+
+    expect(greedy_generate(decoder, prompt, 0, -1).empty(), "zero-token generation");
+    expect(decoder.size_tokens() == 0, "zero-token generation resets request state");
+
+    std::filesystem::remove_all(manifest.parent_path());
+}
+
 }
 
 int main(){
-    test_loads_valid_package();
-    test_rejects_invalid_packages();
-    test_decoder_prefill_decode_and_reset();
-    test_decoder_rejects_invalid_model_and_capacity();
-    std::cout << "qwen model tests passed\n";
-    return 0;
+    try{
+        test_expect_close_rejects_non_finite();
+        test_loads_valid_package();
+        test_rejects_invalid_packages();
+        test_decoder_prefill_decode_and_reset();
+        test_decoder_rejects_invalid_model_and_capacity();
+        test_greedy_generation_stops_and_resets();
+        std::cout << "qwen model tests passed\n";
+        return 0;
+    }catch(const std::exception& error){
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }
