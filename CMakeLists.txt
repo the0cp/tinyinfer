@@ -11,17 +11,25 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
+add_library(tinyinfer_sanitizers INTERFACE)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
+    target_compile_options(
+        tinyinfer_sanitizers INTERFACE
+        -fsanitize=address,undefined -fno-omit-frame-pointer -g
+    )
+    target_link_options(tinyinfer_sanitizers INTERFACE -fsanitize=address,undefined)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "ThreadSanitizer")
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "The ThreadSanitizer build requires GCC or Clang.")
     endif()
-    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g -O1)
-    add_link_options(-fsanitize=thread)
+    target_compile_options(
+        tinyinfer_sanitizers INTERFACE
+        -fsanitize=thread -fno-omit-frame-pointer -g -O1
+    )
+    target_link_options(tinyinfer_sanitizers INTERFACE -fsanitize=thread)
 endif()
 
 find_package(Threads REQUIRED)
@@ -46,7 +54,7 @@ add_library(tinyinfer_tokenizer src/llm/qwen2_tokenizer.cpp)
 add_subdirectory(src)
 
 target_include_directories(tinyinfer PUBLIC include)
-target_link_libraries(tinyinfer PUBLIC Threads::Threads)
+target_link_libraries(tinyinfer PUBLIC Threads::Threads tinyinfer_sanitizers)
 
 if(MSVC)
     target_compile_options(tinyinfer PRIVATE /W4)
@@ -90,6 +98,19 @@ target_compile_definitions(
 )
 target_link_libraries(test_qwen_tokenizer PRIVATE tinyinfer_tokenizer)
 add_test(NAME test_qwen_tokenizer COMMAND test_qwen_tokenizer)
+
+add_executable(tinyinfer_cli apps/tinyinfer.cpp)
+set_target_properties(tinyinfer_cli PROPERTIES OUTPUT_NAME tinyinfer)
+target_link_libraries(tinyinfer_cli PRIVATE tinyinfer_tokenizer)
+add_test(NAME test_cli_help COMMAND tinyinfer_cli --help)
+if(MSVC)
+    target_compile_options(tinyinfer_cli PRIVATE /W4)
+else()
+    target_compile_options(
+        tinyinfer_cli PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+    )
+endif()
 
 add_executable(legacy_mlp_demo examples/legacy_mlp_demo.cpp)
 target_link_libraries(legacy_mlp_demo PRIVATE tinyinfer)

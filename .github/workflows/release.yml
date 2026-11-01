@@ -33,6 +33,7 @@ jobs:
       - name: Package
         run: |
           mkdir -p tinyinfer-linux-x86_64
+          install -m 755 build-release/tinyinfer tinyinfer-linux-x86_64/
           install -m 755 build-release/runtime_demo tinyinfer-linux-x86_64/
           install -m 755 build-release/graph_model_demo tinyinfer-linux-x86_64/
           install -m 755 build-release/check_qwen_layer0 tinyinfer-linux-x86_64/

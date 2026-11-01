@@ -1,71 +1,50 @@
 # tinyinfer
 
-**A lightweight C++20 CPU inference runtime for graph and generative workloads.**
+A lightweight C++20 CPU inference runtime for graph and generative workloads.
 
-tinyinfer is one small inference engine with two execution scenarios:
+## Capabilities
 
-- **Graph inference** compiles a static graph into an execution and memory plan.
-- **Generative inference** runs a stateful Transformer decoder with tokenization, prefill, decode, and KV caching.
+| Area | Implemented |
+|---|---|
+| Tensor | Shared CPU buffers, typed storage, strided views, zero-copy reshape, FP32 activations and BF16 weights |
+| CPU ops | Embedding, Linear, MatMul, Add, ReLU, Softmax, RMSNorm and SwiGLU |
+| Graph runtime | Graph validation, optimization, execution plans, kernel selection and sequential/parallel execution |
+| Memory and profiling | Activation reuse, per-run arenas, node timing, allocation metrics and Chrome trace export |
+| LLM | Qwen2.5 decoder, GQA/MQA, RoPE, Prefill, cached Decode and greedy generation |
+| KV cache | Contiguous cache, paged cache and full-block prefix sharing |
+| Tokenizer | Hugging Face `tokenizer.json` through [`mlc-ai/tokenizers-cpp`](https://github.com/mlc-ai/tokenizers-cpp) submodule|
 
-Both paths share the same Tensor/Buffer representation, CPU primitives, threading foundation, and measurement conventions. The decoder is not required to masquerade as a static graph: stateful generation may use a direct loop when that is clearer.
-
-
-The Decoder Block implements biased Q/K/V projections, RMSNorm, half-split RoPE, Grouped-Query Attention (GQA), SwiGLU, and residual connections. It supports both prefill and cached single-token decode, with small synthetic tests validated against a Hugging Face Transformers reference implementation.
-
-The offline converter preserves the pinned checkpoint's BF16 weights while transposing Linear matrices into tinyinfer's layout. The 988,065,536-byte package is exactly half the previous FP32 payload. The original Hugging Face `tokenizer.json` is consumed by the pinned [`mlc-ai/tokenizers-cpp`](https://github.com/mlc-ai/tokenizers-cpp) submodule. `Qwen2Decoder` runs Embedding → 24 Decoder Blocks → Final RMSNorm → tied LM Head with one KV cache per layer; the fixed chat formatter and greedy loop produce reference-matching text.
-
-## Features
-
-| Component                     | Implementation                                               |
-| ----------------------------- | ------------------------------------------------------------ |
-| **Tensor & operators**        | Shared buffers, strided views, zero-copy reshape, Linear, ReLU, Add, Softmax, and several MatMul kernels. |
-| **Graph runtime**             | Dependency resolution, topological ordering, shape validation, dead-node elimination, and a compiled `ExecutionPlan`. |
-| **Execution**                 | Sequential and dependency-driven parallel executors; configurable inter-op and intra-op threading. |
-| **Memory planning**           | Tensor lifetime analysis and reusable activation buffers in sequential mode; dedicated buffers for parallel execution and a private arena per run. |
-| **Kernel selection**          | Session-initialization-time selection of serial or threaded CPU kernels using shape-aware cost estimates. |
-| **Model loading & profiling** | Native manifest/binary-weight format, per-node timing, allocation tracking, and Chrome trace export. |
-| **Attention & KV cache**      | CPU causal MHA/GQA/MQA, prefill/decode, contiguous and paged KV storage, and reference-counted full-block prefix sharing. |
-| **Decoder Block** | Causal decoder block with RMSNorm, biased QKV, half-split RoPE, GQA, SwiGLU, residual connections, and prefill/decode support. |
-| **Qwen2 model path** | Hugging Face `tokenizer.json`, fixed chat formatting, checked BF16 weights, full 24-layer prefill/decode, greedy EOS stopping, and real text/logit validation. |
-
-The execution pipeline is:
+Graph and generative inference share Tensor, Buffer, CPU operators and the threading foundation.
 
 ```text
-Graph → validation / optimization → ExecutionPlan + MemoryPlan
-      → ExecutionFrame → selected kernels → output Tensor
+Graph -> ExecutionPlan -> selected kernels -> Tensor
+
+Text -> Tokenizer -> Qwen2Decoder -> Prefill/Decode -> token IDs -> Text
 ```
 
-Attention and KV caches sit beside the Graph pipeline and are orchestrated directly by `Qwen2Decoder`. Paged KV cache maps logical token positions to fixed-size physical blocks; `share_prefix_from()` reuses complete prefix blocks without copying K/V.
-
-The intended end state is deliberately small:
+## Source tree
 
 ```text
-tinyinfer CLI
-  ├── run      → InferenceSession → ExecutionPlan
-  └── generate → TransformerDecoder → prefill/decode state
-                         │
-        shared Tensor / Buffer / CPU ops / ThreadPool
+include/tinyinfer/
+  core/       Tensor, Buffer, DataType, ThreadPool
+  compute/    CPU operators
+  graph/      static graph representation
+  runtime/    execution, memory planning, kernels, profiling
+  llm/        Attention, KV caches, Decoder Block, Qwen2
+
+src/          implementations grouped by the same subsystems
+apps/         user-facing CLI
+examples/     small graph and operator examples
+tools/        model conversion and reference checkers
+tests/        unit tests
+benchmark/    focused benchmarks and recorded results
 ```
 
-## Build and test
+## Build
 
-### Full build from source
+Fedora is the reference development and benchmark environment.
 
 The full text-generation build needs CMake 3.19+, a C++20 compiler, Git, and a Rust toolchain with Cargo.
-
-Fedora is the reference development and benchmark environment:
-
-```bash
-sudo dnf install cmake ninja-build gcc-c++ git rust cargo
-git clone --recurse-submodules https://github.com/the0cp/tinyinfer
-cd tinyinfer
-cmake -S . -B build-release -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build build-release --parallel
-ctest --test-dir build-release --output-on-failure
-```
-
-On Fedora under WSL, install the native build tools and Rust with rustup:
 
 ```bash
 sudo dnf install -y gcc-c++ cmake ninja-build git curl pkgconf-pkg-config
@@ -74,43 +53,58 @@ source "$HOME/.cargo/env"
 
 git clone --recurse-submodules https://github.com/the0cp/tinyinfer.git
 cd tinyinfer
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --parallel
+ctest --test-dir build-release --output-on-failure
 ```
 
-Debug builds enable AddressSanitizer and UndefinedBehaviorSanitizer automatically
-with GCC or Clang. ThreadSanitizer requires a separate build because it cannot be
-combined with AddressSanitizer:
+Debug builds enable AddressSanitizer and UndefinedBehaviorSanitizer for tinyinfer targets:
 
 ```bash
+cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-debug --parallel
+ctest --test-dir build-debug --output-on-failure
+```
+
+ThreadSanitizer uses a separate build:
+
+```bash
+sudo dnf install -y libtsan
 cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=ThreadSanitizer
 cmake --build build-tsan --parallel
 ctest --test-dir build-tsan --output-on-failure
 ```
 
-## Tests and benchmarks
+## Generate text
+
+The model directory must contain `model.tiq`, its referenced `weights.bin`, and the original `tokenizer.json`.
+
+```bash
+./build-release/tinyinfer generate \
+  /path/to/model-directory \
+  "Explain KV cache in one sentence." \
+  32
+```
+
+`max-new-tokens` is optional, defaults to 32, and must be positive. The command reports token counts, Prefill latency, Decode latency and throughput.
 
 
-| Benchmark                               |                        Baseline |                      Comparison | Result                   |
-| --------------------------------------- | ------------------------------: | ------------------------------: | ------------------------ |
-| MatMul, 512 × 512                       |     Serial `fast_matmul`: 13 ms |           8-thread MatMul: 6 ms | **2.2× faster**          |
-| Memory planning, 12 ReLU nodes          |                    9.921 µs/run |                    6.092 µs/run | **38.6% lower latency**  |
-| Managed buffer allocations, same graph  |                              12 |                               3 | **75% fewer**            |
-| Cached Attention, 96 tokens, 8Q/8KV     | Full recomputation: 76,570.4 µs | Contiguous KV cache: 2,572.3 µs | **29.8× faster**         |
-| Kernel selection, `[8,512] × [512,512]` |              Serial: 200.117 µs |            Threaded: 131.221 µs | **1.53× faster**         |
-| Full-block prefix sharing               |           20 occupied KV blocks |            8 occupied KV blocks | **60% fewer blocks**     |
-| Small branching graph, 1,000 runs       |             Sequential: 12.1 ms |              Parallel: 170.3 ms | **Parallel ~14× slower** |
+## Graph examples
 
-Performance depends on workload size. Parallel scheduling is counterproductive for tiny graph nodes, while kernel-level parallelism benefits sufficiently large matrix operations. With four tokens per block, the paged-cache benchmark achieves **94.7% mapped-slot utilization** on its five-request workload.
-
-The **60%** prefix-sharing result measures unique occupied KV blocks, not process RSS; the block pool preallocates backing memory. The cached-Attention speedup compares incremental decoding against repeated full recomputation, not paged against contiguous KV storage. See [benchmark results](benchmark/RESULT.md) for configurations, raw measurement definitions, and limitations.
+```bash
+./build-release/graph_demo
+./build-release/graph_model_demo
+./build-release/runtime_demo
+```
 
 
-To run every benchmark:
+## Benchmarks
 
 ```bash
 for name in matmul graph_scheduler session profiler tensor_storage memory_plan kernel_selection kv_cache paged_kv_cache; do
   ./build-release/bench_"$name"
 done
 ```
+
+Measurement definitions and recorded results are in
+[benchmark/RESULT.md](benchmark/RESULT.md).
