@@ -1,5 +1,6 @@
 #include <tinyinfer/llm/qwen2.h>
 #include <tinyinfer/llm/qwen2_tokenizer.h>
+#include <tinyinfer/runtime/model_loader.h>
 
 #include <algorithm>
 #include <charconv>
@@ -7,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -35,6 +37,74 @@ size_t parse_max_new_tokens(std::string_view text){
 int64_t argmax(const tinyinfer::Tensor& logits){
     const float* begin = logits.data();
     return static_cast<int64_t>(std::max_element(begin, begin + logits.numel()) - begin);
+}
+
+tinyinfer::Tensor load_input(
+    const std::filesystem::path& path,
+    const tinyinfer::Shape& shape
+){
+    tinyinfer::Tensor input(shape);
+    const size_t bytes = input.size_bytes();
+    const uintmax_t file_size = std::filesystem::file_size(path);
+
+    if(file_size != bytes){
+        throw std::runtime_error(
+            "Input file has " + std::to_string(file_size) +
+            " bytes; model expects " + std::to_string(bytes) + "."
+        );
+    }
+
+    std::ifstream stream(path, std::ios::binary);
+
+    if(!stream){
+        throw std::runtime_error("Cannot open input file: " + path.string());
+    }
+
+    if(bytes != 0){
+        stream.read(reinterpret_cast<char*>(input.data()), static_cast<std::streamsize>(bytes));
+
+        if(!stream){
+            throw std::runtime_error("Failed to read input file: " + path.string());
+        }
+    }
+    return input;
+}
+
+int run_graph(
+    const std::filesystem::path& manifest,
+    const std::filesystem::path& input_path
+){
+    auto session = tinyinfer::ModelLoader::load(manifest);
+    const tinyinfer::Tensor input = load_input(input_path, session->metadata().input_shape);
+
+    tinyinfer::RunProfile profile;
+    const tinyinfer::Tensor output = session->run(input, profile);
+
+    std::cout << "output_shape=";
+    for(size_t axis = 0; axis < output.dim(); axis++){
+        std::cout << (axis == 0 ? "" : "x") << output.shape()[axis];
+    }
+
+    std::cout << "\noutput_values=" << std::setprecision(9);
+    const float* output_values = output.data();
+    const size_t output_size = output.numel();
+
+    for(size_t i = 0; i < output_size; i++){
+        if(i != 0){
+            std::cout << ' ';
+        }
+        std::cout << output_values[i];
+    }
+
+    std::cout << '\n';
+    if(output_size != 0){
+        std::cout << "predicted_index=" << argmax(output) << '\n';
+    }
+    
+    std::cout << std::fixed << std::setprecision(3)
+              << "inference_ms=" << static_cast<double>(profile.duration_ns) / 1'000'000.0 << '\n'
+              << "peak_live_bytes=" << profile.peak_live_bytes << '\n';
+    return 0;
 }
 
 double milliseconds(Clock::duration duration){
@@ -108,7 +178,7 @@ int generate(
 }
 
 void print_usage(std::ostream& stream){
-    stream << "Usage:\n" << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
+    stream << "Usage:\n" << "  tinyinfer run <model.ti> <input.f32>\n" << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
 }
 
 }
@@ -118,6 +188,10 @@ int main(int argc, char** argv){
         if(argc == 2 && std::string_view(argv[1]) == "--help"){
             print_usage(std::cout);
             return 0;
+        }
+
+        if(argc == 4 && std::string_view(argv[1]) == "run"){
+            return run_graph(argv[2], argv[3]);
         }
 
         if(argc < 4 || argc > 5 || std::string_view(argv[1]) != "generate"){

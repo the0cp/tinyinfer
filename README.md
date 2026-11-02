@@ -88,6 +88,28 @@ The model directory must contain `model.tiq`, its referenced `weights.bin`, and 
 
 `max-new-tokens` is optional, defaults to 32, and must be positive. The command reports token counts, Prefill latency, Decode latency and throughput.
 
+## Run a graph
+
+The input file contains contiguous little-endian FP32 values matching the model input shape.
+
+```bash
+./build-release/tinyinfer run \
+  /path/to/model.ti \
+  /path/to/input.f32
+```
+
+The command prints the output tensor, its `argmax`, runtime latency and peak managed activation bytes.
+
+Fashion-MNIST model preparation uses NumPy outside the C++ runtime:
+
+```bash
+python3 -m venv build/fashion-env
+source build/fashion-env/bin/activate
+python -m pip install numpy
+python tools/prepare_fashion_mnist.py \
+  --output-dir build/fashion-mnist \
+  --tinyinfer build-release/tinyinfer
+```
 
 ## Graph examples
 

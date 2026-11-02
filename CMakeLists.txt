@@ -103,6 +103,14 @@ add_executable(tinyinfer_cli apps/tinyinfer.cpp)
 set_target_properties(tinyinfer_cli PROPERTIES OUTPUT_NAME tinyinfer)
 target_link_libraries(tinyinfer_cli PRIVATE tinyinfer_tokenizer)
 add_test(NAME test_cli_help COMMAND tinyinfer_cli --help)
+add_test(
+    NAME test_cli_run
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DTINYINFER_CLI=$<TARGET_FILE:tinyinfer_cli>
+        -DTEST_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/test-cli-run
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli_run.cmake
+)
 if(MSVC)
     target_compile_options(tinyinfer_cli PRIVATE /W4)
 else()
