@@ -146,6 +146,7 @@ target_link_libraries(check_qwen_model PRIVATE tinyinfer_tokenizer)
 
 foreach(benchmark_name IN ITEMS
     matmul
+    inference_linear
     graph_scheduler
     session
     profiler

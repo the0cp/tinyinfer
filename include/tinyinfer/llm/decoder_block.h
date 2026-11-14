@@ -7,6 +7,8 @@
 
 namespace tinyinfer{
 
+class ThreadPool;
+
 // causal decoder block with:
 // biased QKV projections, half-split RoPE, GQA, and SwiGLU.
 struct DecoderBlockConfig{
@@ -50,14 +52,16 @@ Tensor decoder_block_prefill(
     const Tensor& hidden_states,
     const DecoderBlockConfig& config,
     const DecoderBlockWeights& weights,
-    ContiguousKvCache& cache
+    ContiguousKvCache& cache,
+    ThreadPool* thread_pool = nullptr
 );
 
 Tensor decoder_block_decode(
     const Tensor& hidden_state,
     const DecoderBlockConfig& config,
     const DecoderBlockWeights& weights,
-    ContiguousKvCache& cache
+    ContiguousKvCache& cache,
+    ThreadPool* thread_pool = nullptr
 );
 
 }

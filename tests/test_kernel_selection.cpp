@@ -111,6 +111,32 @@ void test_selector_filters_then_ranks_deterministically(){
     );
 }
 
+void test_builtin_linear_cost_competes_with_custom_candidate(){
+    const Node node{"linear", OpType::Linear, {"input", "weight", "bias"}, "output"};
+    const KernelSelectionContext context{
+        {Shape{8, 262144}, Shape{262144, 1}, Shape{1}},
+        Shape{8, 1},
+        12
+    };
+
+    KernelRegistry builtin;
+    const auto threaded = builtin.select_kernel(node, context);
+    expect(threaded.record.kernel_name == "cpu.linear.threaded",
+           "eight rows and one column use row parallelism");
+    expect(threaded.record.estimated_cost == 1310720,
+           "threaded cost includes task overhead for eight workers");
+
+    KernelRegistry custom;
+    custom.register_kernel(OpType::Linear, candidate("custom.linear", 1100000));
+    expect(custom.select_kernel(node, context).record.kernel_name == "custom.linear",
+           "third candidate can beat the built-in threaded cost");
+
+    KernelRegistry slower_custom;
+    slower_custom.register_kernel(OpType::Linear, candidate("custom.linear", 1500000));
+    expect(slower_custom.select_kernel(node, context).record.kernel_name == "cpu.linear.threaded",
+           "built-in threaded cost can beat a slower third candidate");
+}
+
 std::vector<float> values(size_t count, float scale){
     std::vector<float> result(count);
     for(size_t index = 0; index < count; index++){
@@ -173,6 +199,13 @@ void test_builtin_selection_is_cached_observable_and_correct(){
     expect(large->plan().dump_kernel_plan().find("lowest estimated cost") !=
                std::string::npos,
            "kernel decision is observable");
+
+    auto wide = linear_session(1, 512, 4096, options);
+    expect(
+        wide->plan().nodes().front().kernel_selection.kernel_name ==
+            "cpu.linear.threaded",
+        "wide single-row Linear selects column-parallel kernel"
+    );
 
     Tensor input({64, 128}, values(64 * 128, 0.03f));
     const Tensor expected = linear(
@@ -305,6 +338,8 @@ int main(){
     const std::vector<std::pair<const char*, void(*)()>> tests{
         {"selector_filters_then_ranks_deterministically",
          test_selector_filters_then_ranks_deterministically},
+        {"builtin_linear_cost_competes_with_custom_candidate",
+         test_builtin_linear_cost_competes_with_custom_candidate},
         {"builtin_selection_is_cached_observable_and_correct",
          test_builtin_selection_is_cached_observable_and_correct},
         {"selection_happens_once_during_build", test_selection_happens_once_during_build},

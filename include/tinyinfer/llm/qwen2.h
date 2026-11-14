@@ -1,10 +1,12 @@
 #pragma once
 
 #include <tinyinfer/llm/decoder_block.h>
+#include <tinyinfer/core/thread_pool.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -36,7 +38,7 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path);
 
 class Qwen2Decoder{
 public:
-    Qwen2Decoder(Qwen2Model model, size_t max_tokens);
+    Qwen2Decoder(Qwen2Model model, size_t max_tokens, size_t num_threads = 1);
 
     Qwen2Decoder(const Qwen2Decoder&) = delete;
     Qwen2Decoder& operator=(const Qwen2Decoder&) = delete;
@@ -50,12 +52,14 @@ public:
 
     size_t size_tokens() const noexcept;
     size_t capacity_tokens() const noexcept;
+    size_t num_threads() const noexcept;
 
 private:
     Tensor last_token_logits(const Tensor& hidden_states) const;
 
     Qwen2Model model_;
     std::vector<ContiguousKvCache> caches_;
+    std::unique_ptr<ThreadPool> thread_pool_;
     size_t capacity_tokens_;
 };
 

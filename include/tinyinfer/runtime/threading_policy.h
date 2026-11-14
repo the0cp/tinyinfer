@@ -2,10 +2,25 @@
 
 #include <tinyinfer/runtime/session_options.h>
 
+#include <cstdint>
 #include <cstddef>
 #include <string>
 
 namespace tinyinfer{
+
+uint64_t estimate_linear_cost(
+    size_t rows,
+    size_t input_features,
+    size_t output_features,
+    size_t thread_count
+) noexcept;
+
+bool prefer_threaded_linear(
+    size_t rows,
+    size_t input_features,
+    size_t output_features,
+    size_t thread_count
+) noexcept;
 
 // A resolved, immutable threading decision for one initialized session.
 // SessionOptions stores user requests; ThreadingPlan stores what the runtime

@@ -652,7 +652,7 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
     };
 }
 
-Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens)
+Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens, size_t num_threads)
     : model_(std::move(model)), capacity_tokens_(max_tokens){
     validate_execution_model(model_);
     if(capacity_tokens_ == 0){
@@ -661,6 +661,14 @@ Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens)
 
     if(capacity_tokens_ > model_.config.max_position_embeddings){
         throw std::invalid_argument("Qwen2 decoder capacity exceeds the model limit.");
+    }
+
+    if(num_threads == 0){
+        throw std::invalid_argument("Qwen2 decoder requires at least one thread.");
+    }
+
+    if(num_threads > 1){
+        thread_pool_ = std::make_unique<ThreadPool>(num_threads);
     }
 
     const size_t head_dim = model_.config.block.hidden_size / model_.config.block.query_heads;
@@ -695,6 +703,14 @@ Tensor Qwen2Decoder::last_token_logits(const Tensor& hidden_states) const{
 
     // Tied LM head: project the normalized hidden state to the 
     // vocabulary size using the token embedding weights
+    if(thread_pool_){
+        return threadpool_matmul_transposed_b(
+            normalized,
+            model_.token_embedding,
+            *thread_pool_,
+            thread_pool_->size()
+        );
+    }
     return matmul_transposed_b(normalized, model_.token_embedding);
 }
 
@@ -713,7 +729,8 @@ Tensor Qwen2Decoder::prefill(std::span<const int64_t> token_ids){
             hidden_states,
             model_.config.block,
             model_.layers[layer],
-            caches_[layer]
+            caches_[layer],
+            thread_pool_.get()
         );
     }
 
@@ -739,7 +756,8 @@ Tensor Qwen2Decoder::decode(int64_t token_id){
             hidden_state,
             model_.config.block,
             model_.layers[layer],
-            caches_[layer]
+            caches_[layer],
+            thread_pool_.get()
         );
     }
 
@@ -758,6 +776,10 @@ size_t Qwen2Decoder::size_tokens() const noexcept{
 
 size_t Qwen2Decoder::capacity_tokens() const noexcept{
     return capacity_tokens_;
+}
+
+size_t Qwen2Decoder::num_threads() const noexcept{
+    return thread_pool_ ? thread_pool_->size() : 1;
 }
 
 std::vector<int64_t> greedy_generate(

@@ -228,6 +228,69 @@ void test_block_matches_transformers_reference(){
         2e-5f
     );
     expect(decode_cache.size_tokens() == 3, "decode cache size");
+
+}
+
+void test_block_dispatches_large_projection_to_pool(){
+    const DecoderBlockConfig config{256, 4096, 4, 1, 1e-6f, 10000.0f};
+    DecoderBlockWeights weights{
+        Tensor({256}, std::vector<float>(256, 1.0f)),
+        Tensor({256, 256}), Tensor({256}),
+        Tensor({256, 64}), Tensor({64}),
+        Tensor({256, 64}), Tensor({64}),
+        Tensor({256, 256}),
+        Tensor({256}, std::vector<float>(256, 1.0f)),
+        Tensor({256, 4096}), Tensor({256, 4096}), Tensor({4096, 256})
+    };
+    for(Tensor* weight : {
+        &weights.q_weight, &weights.k_weight, &weights.v_weight,
+        &weights.o_weight, &weights.gate_weight, &weights.up_weight,
+        &weights.down_weight
+    }){
+        for(size_t i = 0; i < weight->numel(); i++){
+            weight->data()[i] = static_cast<float>(static_cast<int>(i % 7) - 3) * 0.001f;
+        }
+    }
+    Tensor input({1, 256});
+    for(size_t i = 0; i < input.numel(); i++){
+        input.data()[i] = static_cast<float>(static_cast<int>(i % 11) - 5) * 0.01f;
+    }
+    ThreadPool pool(2);
+
+    ContiguousKvCache serial_cache({2, 1, 64});
+    ContiguousKvCache threaded_cache({2, 1, 64});
+    const Tensor serial_prefill = decoder_block_prefill(input, config, weights, serial_cache);
+    const Tensor threaded_prefill = decoder_block_prefill(
+        input, config, weights, threaded_cache, &pool
+    );
+    for(size_t i = 0; i < serial_prefill.numel(); i++){
+        expect_close(threaded_prefill.data()[i], serial_prefill.data()[i], 2e-5f);
+    }
+    const Tensor serial_decode = decoder_block_decode(input, config, weights, serial_cache);
+    const Tensor threaded_decode = decoder_block_decode(
+        input, config, weights, threaded_cache, &pool
+    );
+    for(size_t i = 0; i < serial_decode.numel(); i++){
+        expect_close(threaded_decode.data()[i], serial_decode.data()[i], 2e-5f);
+    }
+
+    ContiguousKvCache worker_cache({2, 1, 64});
+    Tensor worker_prefill({1, 256});
+    Tensor worker_decode({1, 256});
+    size_t prefill_cache_size = 0;
+    pool.enqueue([&](){
+        worker_prefill = decoder_block_prefill(input, config, weights, worker_cache, &pool);
+        prefill_cache_size = worker_cache.size_tokens();
+        worker_decode = decoder_block_decode(input, config, weights, worker_cache, &pool);
+    });
+    pool.wait();
+    expect(prefill_cache_size == 1, "worker prefill appends one token");
+    expect(worker_cache.size_tokens() == 2, "worker decode appends one token");
+    for(size_t i = 0; i < serial_prefill.numel(); i++){
+        expect_close(worker_prefill.data()[i], serial_prefill.data()[i], 2e-5f);
+        expect_close(worker_decode.data()[i], serial_decode.data()[i], 2e-5f);
+    }
+
 }
 
 void test_invalid_weights_do_not_mutate_cache(){
@@ -293,6 +356,7 @@ int main(){
     test_transformer_ops();
     test_half_split_rope_layout();
     test_block_matches_transformers_reference();
+    test_block_dispatches_large_projection_to_pool();
     test_invalid_weights_do_not_mutate_cache();
     test_cache_preconditions_precede_projection();
     std::cout << "decoder block tests passed\n";

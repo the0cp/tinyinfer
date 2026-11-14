@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -130,7 +131,8 @@ int generate(
 
     const size_t capacity = prompt.size() + cached_gened_tokens;
     const int64_t eos_token_id = model.config.eos_token_id;
-    tinyinfer::Qwen2Decoder decoder(std::move(model), capacity);
+    const size_t cpu_threads = std::max<size_t>(1, std::thread::hardware_concurrency());
+    tinyinfer::Qwen2Decoder decoder(std::move(model), capacity, cpu_threads);
 
     std::vector<int64_t> generated;
     generated.reserve(max_new_tokens);
@@ -168,6 +170,7 @@ int generate(
 
     std::cout << tokenizer.decode(generated, true) << "\n\n"
               << std::fixed << std::setprecision(3)
+              << "cpu_threads=" << cpu_threads << '\n'
               << "prompt_tokens=" << prompt.size() << '\n'
               << "generated_tokens=" << generated.size() << '\n'
               << "prefill_ms=" << prefill_ms << '\n'

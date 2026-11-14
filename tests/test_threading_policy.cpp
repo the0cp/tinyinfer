@@ -93,6 +93,15 @@ void test_threading_plan_resolution(){
            "no nested parallelism exists after normalization");
 }
 
+void test_linear_threading_policy(){
+    expect(!prefer_threaded_linear(1, 896, 128, 12), "small decode projection stays serial");
+    expect(!prefer_threaded_linear(1, 896, 896, 12), "hidden decode projection stays serial");
+    expect(prefer_threaded_linear(1, 896, 4864, 12), "wide decode projection is threaded");
+    expect(prefer_threaded_linear(32, 896, 128, 12), "prefill projection is row parallel");
+    expect(prefer_threaded_linear(8, 262144, 1, 12), "eight rows and one column stay row parallel");
+    expect(!prefer_threaded_linear(32, 896, 4864, 1), "one thread stays serial");
+}
+
 void test_parallel_for_contract(){
     ThreadPool pool(3);
     std::vector<std::atomic<size_t>> visits(10);
@@ -190,9 +199,9 @@ Graph make_linear_graph(size_t input_features, size_t output_features){
 }
 
 void test_session_policy_and_concurrent_runs(){
-    constexpr size_t batch = 32;
-    constexpr size_t input_features = 64;
-    constexpr size_t output_features = 48;
+    constexpr size_t batch = 64;
+    constexpr size_t input_features = 128;
+    constexpr size_t output_features = 128;
     Tensor input({batch, input_features}, make_values(batch * input_features, 0.03f));
 
     SessionOptions sequential_options;
@@ -273,6 +282,7 @@ void test_session_policy_and_concurrent_runs(){
 int main(){
     const std::vector<std::pair<const char*, void (*)()>> tests{
         {"threading_plan_resolution", test_threading_plan_resolution},
+        {"linear_threading_policy", test_linear_threading_policy},
         {"parallel_for_contract", test_parallel_for_contract},
         {"concurrent_task_groups_are_isolated", test_concurrent_task_groups_are_isolated},
         {"session_policy_and_concurrent_runs", test_session_policy_and_concurrent_runs}

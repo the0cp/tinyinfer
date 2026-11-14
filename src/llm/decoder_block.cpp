@@ -2,6 +2,7 @@
 
 #include <tinyinfer/llm/attention.h>
 #include <tinyinfer/compute/ops.h>
+#include <tinyinfer/runtime/threading_policy.h>
 
 #include <algorithm>
 #include <cmath>
@@ -143,19 +144,38 @@ size_t validate_execution(
     return head_dim;
 }
 
+Tensor project(
+    const Tensor& input,
+    const Tensor& weight,
+    ThreadPool* thread_pool,
+    const Tensor* bias = nullptr
+){
+    ThreadPool* selected_pool = thread_pool != nullptr && prefer_threaded_linear(
+        input.shape()[0], input.shape()[1], weight.shape()[1], thread_pool->size()
+    ) ? thread_pool : nullptr;
+
+    return linear(input, weight, bias, selected_pool);
+}
+
+ThreadPool* block_thread_pool(ThreadPool* thread_pool){
+    return thread_pool != nullptr && thread_pool->is_current_worker_thread() ? nullptr : thread_pool;
+}
+
 Tensor finish_block(
     const Tensor& hidden_states,
     const Tensor& attention,
     const DecoderBlockConfig& config,
-    const DecoderBlockWeights& weights
+    const DecoderBlockWeights& weights,
+    ThreadPool* thread_pool
 ){
     // Concat attention heads and mix their features
     // [T, num_q_heads, head_dim] -> [T, hidden_size]
     // O = Concat(head_0, ..., head_n) * W_O
 
-    const Tensor attention_output = linear(
+    const Tensor attention_output = project(
         attention.reshape({hidden_states.shape()[0], config.hidden_size}),
-        weights.o_weight
+        weights.o_weight,
+        thread_pool
     );
 
     // H1 = X + O: Preserves an identity path for information and gradients.
@@ -173,12 +193,16 @@ Tensor finish_block(
     // F = SiLU(Gate) element-wise multiplied by Up
     // SiLU(x) = x * sigmoid(x)
     // F = SiLU(Gate) \odot Up
-    const Tensor gate = linear(normalized, weights.gate_weight);
-    const Tensor up = linear(normalized, weights.up_weight);
+    const Tensor gate = project(normalized, weights.gate_weight, thread_pool);
+    const Tensor up = project(normalized, weights.up_weight, thread_pool);
 
     // Down projection
     // D = F * W_down: [T, 4864] -> [T, 896]
-    const Tensor feed_forward = linear(silu_mul(gate, up), weights.down_weight);
+    const Tensor feed_forward = project(
+        silu_mul(gate, up),
+        weights.down_weight,
+        thread_pool
+    );
     
     // MLP residual connection
     // H_out = H1 + D: [T, hidden_size]
@@ -196,7 +220,8 @@ Qkv project_qkv(
     const DecoderBlockConfig& config,
     const DecoderBlockWeights& weights,
     size_t head_dim,
-    size_t position_offset
+    size_t position_offset,
+    ThreadPool* thread_pool
 ){
     const Tensor normalized = rms_norm(
         hidden_states,
@@ -206,15 +231,30 @@ Qkv project_qkv(
 
     const size_t tokens = hidden_states.shape()[0];
 
-    Tensor queries = linear(normalized, weights.q_weight, weights.q_bias).reshape(
+    Tensor queries = project(
+        normalized,
+        weights.q_weight,
+        thread_pool,
+        &weights.q_bias
+    ).reshape(
         {tokens, config.query_heads, head_dim}
     );
 
-    Tensor keys = linear(normalized, weights.k_weight, weights.k_bias).reshape(
+    Tensor keys = project(
+        normalized,
+        weights.k_weight,
+        thread_pool,
+        &weights.k_bias
+    ).reshape(
         {tokens, config.kv_heads, head_dim}
     );
 
-    Tensor values = linear(normalized, weights.v_weight, weights.v_bias).reshape(
+    Tensor values = project(
+        normalized,
+        weights.v_weight,
+        thread_pool,
+        &weights.v_bias
+    ).reshape(
         {tokens, config.kv_heads, head_dim}
     );
 
@@ -319,7 +359,8 @@ Tensor decoder_block_prefill(
     const Tensor& hidden_states,
     const DecoderBlockConfig& config,
     const DecoderBlockWeights& weights,
-    ContiguousKvCache& cache
+    ContiguousKvCache& cache,
+    ThreadPool* thread_pool
 ){
     const size_t head_dim = validate_execution(
         hidden_states,
@@ -336,7 +377,17 @@ Tensor decoder_block_prefill(
         throw std::length_error("Decoder block prefill exceeds KV cache capacity.");
     }
 
-    const Qkv qkv = project_qkv(hidden_states, config, weights, head_dim, 0);
+    thread_pool = block_thread_pool(thread_pool);
+
+    const Qkv qkv = project_qkv(
+        hidden_states,
+        config,
+        weights,
+        head_dim,
+        0,
+        thread_pool
+    );
+    
     const Tensor attention = attention_prefill(
         qkv.queries,
         qkv.keys,
@@ -344,14 +395,15 @@ Tensor decoder_block_prefill(
         cache
     );
 
-    return finish_block(hidden_states, attention, config, weights);
+    return finish_block(hidden_states, attention, config, weights, thread_pool);
 }
 
 Tensor decoder_block_decode(
     const Tensor& hidden_state,
     const DecoderBlockConfig& config,
     const DecoderBlockWeights& weights,
-    ContiguousKvCache& cache
+    ContiguousKvCache& cache,
+    ThreadPool* thread_pool
 ){
     const size_t head_dim = validate_execution(
         hidden_state,
@@ -368,12 +420,15 @@ Tensor decoder_block_decode(
         throw std::length_error("Decoder block decode exceeds KV cache capacity.");
     }
 
+    thread_pool = block_thread_pool(thread_pool);
+
     const Qkv qkv = project_qkv(
         hidden_state,
         config,
         weights,
         head_dim,
-        cache.size_tokens()
+        cache.size_tokens(),
+        thread_pool
     );
 
     const Tensor attention = attention_decode(
@@ -383,7 +438,7 @@ Tensor decoder_block_decode(
         cache
     );
 
-    return finish_block(hidden_state, attention, config, weights);
+    return finish_block(hidden_state, attention, config, weights, thread_pool);
 }
 
 }

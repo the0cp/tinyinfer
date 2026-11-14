@@ -242,6 +242,7 @@ void test_decoder_prefill_decode_and_reset(){
     Qwen2Decoder decoder(model, 4);
 
     expect(decoder.capacity_tokens() == 4, "decoder capacity");
+    expect(decoder.num_threads() == 1, "serial decoder thread count");
     expect(decoder.size_tokens() == 0, "new decoder cache is empty");
     expect_throw([&](){ (void)decoder.decode(1); }, "prefill first");
     expect_throw([&](){ (void)decoder.prefill({}); }, "at least one token");
@@ -265,6 +266,11 @@ void test_decoder_prefill_decode_and_reset(){
     const Tensor full_logits = full_recompute.prefill(full_sequence);
     expect_close(cached_logits, full_logits);
 
+    Qwen2Decoder threaded(model, 4, 2);
+    expect(threaded.num_threads() == 2, "threaded decoder thread count");
+    expect_close(threaded.prefill(prompt), prefill_logits);
+    expect_close(threaded.decode(3), cached_logits);
+
     decoder.reset();
     expect(decoder.size_tokens() == 0, "reset clears every layer cache");
     expect_close(decoder.prefill(prompt), prefill_logits);
@@ -278,6 +284,7 @@ void test_decoder_rejects_invalid_model_and_capacity(){
 
     expect_throw([&](){ Qwen2Decoder decoder(model, 0); }, "capacity");
     expect_throw([&](){ Qwen2Decoder decoder(model, 33); }, "model limit");
+    expect_throw([&](){ Qwen2Decoder decoder(model, 4, 0); }, "thread");
 
     model.layers.clear();
     expect_throw([&](){ Qwen2Decoder decoder(model, 4); }, "layer count");

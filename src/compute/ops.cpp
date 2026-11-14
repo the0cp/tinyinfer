@@ -82,17 +82,16 @@ float as_float(BFloat16 value) noexcept{
     return value.to_float();
 }
 
-struct LinearDimensions{
-    size_t batch;
-    size_t input_features;
-    size_t output_features;
+struct LinearShape{
+    size_t rows;
+    size_t in_features;
+    size_t out_features;
 };
 
-LinearDimensions prepare_linear(
+LinearShape validate_linear(
     const Tensor& x,
     const Tensor& weight,
-    const Tensor* bias,
-    Tensor& out
+    const Tensor* bias
 ){
     if(x.dim() != 2 || weight.dim() != 2){
         throw std::runtime_error("linear expects 2D input and weight tensors.");
@@ -101,143 +100,213 @@ LinearDimensions prepare_linear(
         throw std::runtime_error("linear expects a 1D bias tensor.");
     }
 
-    const LinearDimensions dimensions{x.shape()[0], x.shape()[1], weight.shape()[1]};
-    if(weight.shape()[0] != dimensions.input_features){
+    const LinearShape shape{x.shape()[0], x.shape()[1], weight.shape()[1]};
+    if(weight.shape()[0] != shape.in_features){
         throw std::runtime_error("linear input and weight shapes do not match.");
     }
-    if(bias != nullptr && bias->shape()[0] != dimensions.output_features){
+    if(bias != nullptr && bias->shape()[0] != shape.out_features){
         throw std::runtime_error("linear weight and bias shapes do not match.");
     }
 
-    require_output(out, Shape{dimensions.batch, dimensions.output_features}, "linear");
-    require_disjoint_input(x, out, "linear");
-    require_disjoint_weight(weight, out, "linear");
+    require_input(x, "linear");
+    require_weight(weight, "linear");
     if(bias != nullptr){
-        require_disjoint_weight(*bias, out, "linear");
+        require_weight(*bias, "linear");
     }
-    return dimensions;
+    return shape;
 }
 
-template<typename Value>
-void init_linear_rows(
-    const Value* bias,
-    float* out,
-    const LinearDimensions& dimensions,
-    size_t row_begin,
-    size_t row_end
+LinearShape validate_linear_out(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor* bias,
+    Tensor& out
 ){
-    for(size_t row = row_begin; row < row_end; row++){
-        float* out_row = out + row * dimensions.output_features;
-        for(size_t column = 0; column < dimensions.output_features; column++){
-            out_row[column] = as_float(bias[column]);
-        }
+    const LinearShape shape = validate_linear(x, weight, bias);
+    require_output(out, Shape{shape.rows, shape.out_features}, "linear");
+    require_disjoint_storage(x, out, "linear");
+    require_disjoint_storage(weight, out, "linear");
+    if(bias != nullptr){
+        require_disjoint_storage(*bias, out, "linear");
     }
+    return shape;
 }
 
-void init_linear_rows(
+template<typename Weight>
+void linear_kernel(
+    const Tensor& x,
+    const Weight* weights,
     const Tensor* bias,
     Tensor& out,
-    const LinearDimensions& dimensions,
+    const LinearShape& shape,
     size_t row_begin,
-    size_t row_end
+    size_t row_end,
+    size_t col_begin,
+    size_t col_end
 ){
-    float* out_data = out.data();
-    if(bias == nullptr){
-        std::fill(
-            out_data + row_begin * dimensions.output_features,
-            out_data + row_end * dimensions.output_features,
-            0.0f
-        );
-    }else if(bias->dtype() == DataType::Float32){
-        init_linear_rows(
-            bias->data(), out_data, dimensions, row_begin, row_end
-        );
-    }else{
-        init_linear_rows(
-            bias->bfloat16_data(), out_data, dimensions, row_begin, row_end
-        );
-    }
-}
-
-template<typename Weight>
-void accumulate_linear_rows(
-    const float* x_data,
-    const Weight* weight_data,
-    float* out_data,
-    const LinearDimensions& dimensions,
-    size_t row_begin,
-    size_t row_end
-){
+    const float* float_bias = bias != nullptr && bias->dtype() == DataType::Float32
+        ? bias->data() : nullptr;
+    const BFloat16* bfloat16_bias = bias != nullptr && float_bias == nullptr
+        ? bias->bfloat16_data() : nullptr;
+    const float* input = x.data();
+    float* output = out.data();
     for(size_t row = row_begin; row < row_end; row++){
-        float* out_row = out_data + row * dimensions.output_features;
-        for(size_t inner = 0; inner < dimensions.input_features; inner++){
-            const float x_value = x_data[row * dimensions.input_features + inner];
-            const Weight* weight_row =
-                weight_data + inner * dimensions.output_features;
-            for(size_t column = 0; column < dimensions.output_features; column++){
-                out_row[column] += x_value * as_float(weight_row[column]);
+        float* out_row = output + row * shape.out_features;
+        if(float_bias != nullptr){
+            std::copy_n(
+                float_bias + col_begin,
+                col_end - col_begin,
+                out_row + col_begin
+            );
+        }else if(bfloat16_bias != nullptr){
+            for(size_t col = col_begin; col < col_end; col++){
+                out_row[col] = bfloat16_bias[col].to_float();
+            }
+        }else{
+            std::fill(out_row + col_begin, out_row + col_end, 0.0f);
+        }
+        for(size_t inner = 0; inner < shape.in_features; inner++){
+            const float x_value = input[row * shape.in_features + inner];
+            const Weight* weight_row = weights + inner * shape.out_features;
+            for(size_t col = col_begin; col < col_end; col++){
+                out_row[col] += x_value * as_float(weight_row[col]);
             }
         }
     }
 }
 
-template<typename Weight>
-void compute_matmul_transposed_b(
-    const float* input,
-    const Weight* weight,
-    float* output,
-    size_t rows,
-    size_t output_features,
-    size_t input_features
-){
-    for(size_t row = 0; row < rows; row++){
-        const float* input_row = input + row * input_features;
-        float* output_row = output + row * output_features;
-
-        for(size_t feature = 0; feature < output_features; feature++){
-            const Weight* weight_row = weight + feature * input_features;
-            float sum = 0.0f;
-
-            for(size_t inner = 0; inner < input_features; inner++){
-                sum += input_row[inner] * as_float(weight_row[inner]);
-            }
-
-            output_row[feature] = sum;
-        }
-    }
-}
-
-void compute_linear_rows(
+void run_linear(
     const Tensor& x,
     const Tensor& weight,
     const Tensor* bias,
     Tensor& out,
-    const LinearDimensions& dimensions,
+    const LinearShape& shape,
     size_t row_begin,
-    size_t row_end
+    size_t row_end,
+    size_t col_begin,
+    size_t col_end
 ){
-    const float* x_data = x.data();
-    float* out_data = out.data();
-    init_linear_rows(bias, out, dimensions, row_begin, row_end);
     if(weight.dtype() == DataType::Float32){
-        accumulate_linear_rows(
-            x_data,
-            weight.data(),
-            out_data,
-            dimensions,
-            row_begin,
-            row_end
+        linear_kernel(
+            x, weight.data(), bias, out, shape,
+            row_begin, row_end, col_begin, col_end
         );
-    }else{
-        accumulate_linear_rows(
-            x_data,
-            weight.bfloat16_data(),
-            out_data,
-            dimensions,
-            row_begin,
-            row_end
-        );
+        return;
     }
+    linear_kernel(
+        x, weight.bfloat16_data(), bias, out, shape,
+        row_begin, row_end, col_begin, col_end
+    );
+}
+
+template<typename Weight>
+void matmul_bt_kernel(
+    const Tensor& a,
+    const Weight* weights,
+    Tensor& out,
+    size_t inner_size,
+    size_t col_begin,
+    size_t col_end
+){
+    const size_t rows = a.shape()[0];
+    const size_t cols = out.shape()[1];
+    const float* input_data = a.data();
+    float* output_data = out.data();
+    for(size_t row = 0; row < rows; row++){
+        const float* input = input_data + row * inner_size;
+        float* output = output_data + row * cols;
+        for(size_t col = col_begin; col < col_end; col++){
+            const Weight* weight = weights + col * inner_size;
+            float sum = 0.0f;
+            for(size_t inner = 0; inner < inner_size; inner++){
+                sum += input[inner] * as_float(weight[inner]);
+            }
+            output[col] = sum;
+        }
+    }
+}
+
+void validate_matmul_bt(const Tensor& a, const Tensor& bt){
+    if(a.dim() != 2 || bt.dim() != 2){
+        throw std::runtime_error("matmul_transposed_b only supports 2D tensors.");
+    }
+    if(bt.shape()[1] != a.shape()[1]){
+        throw std::runtime_error("matmul_transposed_b shape mismatch.");
+    }
+    require_input(a, "matmul_transposed_b");
+    require_weight(bt, "matmul_transposed_b");
+}
+
+Tensor matmul_bt(
+    const Tensor& a,
+    const Tensor& bt,
+    ThreadPool* pool,
+    size_t num_tasks
+){
+    validate_matmul_bt(a, bt);
+    const size_t rows = a.shape()[0];
+    const size_t inner_size = a.shape()[1];
+    const size_t cols = bt.shape()[0];
+    Tensor out({rows, cols});
+    if(out.numel() == 0 || inner_size == 0){
+        return out;
+    }
+
+    const auto run = [&](const auto* weights){
+        const auto kernel = [&](size_t col_begin, size_t col_end){
+            matmul_bt_kernel(a, weights, out, inner_size, col_begin, col_end);
+        };
+        if(pool != nullptr){
+            pool->parallel_for(cols, num_tasks, kernel);
+        }else{
+            kernel(0, cols);
+        }
+    };
+    if(bt.dtype() == DataType::Float32){
+        run(bt.data());
+    }else{
+        run(bt.bfloat16_data());
+    }
+    return out;
+}
+
+void parallel_linear(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor* bias,
+    Tensor& out,
+    ThreadPool& pool,
+    size_t num_tasks,
+    const LinearShape& shape
+){
+    if(out.numel() == 0){
+        return;
+    }
+
+    if(shape.rows > 1){
+        pool.parallel_for(
+            shape.rows,
+            num_tasks,
+            [&](size_t row_begin, size_t row_end){
+                run_linear(
+                    x, weight, bias, out, shape,
+                    row_begin, row_end, 0, shape.out_features
+                );
+            }
+        );
+        return;
+    }
+
+    pool.parallel_for(
+        shape.out_features,
+        num_tasks,
+        [&](size_t col_begin, size_t col_end){
+            run_linear(
+                x, weight, bias, out, shape,
+                0, 1, col_begin, col_end
+            );
+        }
+    );
 }
 
 }
@@ -416,33 +485,16 @@ Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
 }
 
 Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt){
-    if(a.dim() != 2 || bt.dim() != 2){
-        throw std::runtime_error("matmul_transposed_b only supports 2D tensors.");
-    }
+    return matmul_bt(a, bt, nullptr, 1);
+}
 
-    const size_t m = a.shape()[0];
-    const size_t k = a.shape()[1];
-    const size_t n = bt.shape()[0];
-
-    if(bt.shape()[1] != k){
-        throw std::runtime_error("matmul_transposed_b shape mismatch.");
-    }
-
-    Tensor out({m, n});
-    require_input(a, "matmul_transposed_b");
-    require_weight(bt, "matmul_transposed_b");
-
-    if(bt.dtype() == DataType::Float32){
-        compute_matmul_transposed_b(
-            a.data(), bt.data(), out.data(), m, n, k
-        );
-    }else{
-        compute_matmul_transposed_b(
-            a.data(), bt.bfloat16_data(), out.data(), m, n, k
-        );
-    }
-
-    return out;
+Tensor threadpool_matmul_transposed_b(
+    const Tensor& a,
+    const Tensor& bt,
+    ThreadPool& pool,
+    size_t num_tasks
+){
+    return matmul_bt(a, bt, &pool, num_tasks);
 }
 
 Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
@@ -623,19 +675,25 @@ Tensor embedding(const Tensor& weight, std::span<const int64_t> token_ids){
 }
 
 void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out){
-    const LinearDimensions dimensions = prepare_linear(x, weight, &bias, out);
+    const LinearShape shape = validate_linear_out(x, weight, &bias, out);
     if(out.numel() == 0){
         return;
     }
-    compute_linear_rows(x, weight, &bias, out, dimensions, 0, dimensions.batch);
+    run_linear(
+        x, weight, &bias, out, shape,
+        0, shape.rows, 0, shape.out_features
+    );
 }
 
 void linear_out(const Tensor& x, const Tensor& weight, Tensor& out){
-    const LinearDimensions dimensions = prepare_linear(x, weight, nullptr, out);
+    const LinearShape shape = validate_linear_out(x, weight, nullptr, out);
     if(out.numel() == 0){
         return;
     }
-    compute_linear_rows(x, weight, nullptr, out, dimensions, 0, dimensions.batch);
+    run_linear(
+        x, weight, nullptr, out, shape,
+        0, shape.rows, 0, shape.out_features
+    );
 }
 
 void threadpool_linear_out(
@@ -646,46 +704,46 @@ void threadpool_linear_out(
     ThreadPool& pool,
     size_t num_tasks
 ){
-    const LinearDimensions dimensions = prepare_linear(x, weight, &bias, out);
-    if(out.numel() == 0){
-        return;
-    }
+    const LinearShape shape = validate_linear_out(x, weight, &bias, out);
+    parallel_linear(x, weight, &bias, out, pool, num_tasks, shape);
+}
 
-    pool.parallel_for(
-        dimensions.batch,
-        num_tasks,
-        [&](size_t row_begin, size_t row_end){
-            compute_linear_rows(
-                x,
-                weight,
-                &bias,
-                out,
-                dimensions,
-                row_begin,
-                row_end
-            );
-        }
-    );
+void threadpool_linear_out(
+    const Tensor& x,
+    const Tensor& weight,
+    Tensor& out,
+    ThreadPool& pool,
+    size_t num_tasks
+){
+    const LinearShape shape = validate_linear_out(x, weight, nullptr, out);
+    parallel_linear(x, weight, nullptr, out, pool, num_tasks, shape);
+}
+
+Tensor linear(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor* bias,
+    ThreadPool* pool
+){
+    const LinearShape shape = validate_linear(x, weight, bias);
+    Tensor out({shape.rows, shape.out_features});
+    if(pool != nullptr){
+        parallel_linear(x, weight, bias, out, *pool, pool->size(), shape);
+    }else if(out.numel() != 0){
+        run_linear(
+            x, weight, bias, out, shape,
+            0, shape.rows, 0, shape.out_features
+        );
+    }
+    return out;
 }
 
 Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
-    if(x.dim() != 2 || weight.dim() != 2){
-        throw std::runtime_error("linear expects 2D input and weight tensors.");
-    }
-
-    Tensor out({x.shape()[0], weight.shape()[1]});
-    linear_out(x, weight, bias, out);
-    return out;
+    return linear(x, weight, &bias, nullptr);
 }
 
 Tensor linear(const Tensor& x, const Tensor& weight){
-    if(x.dim() != 2 || weight.dim() != 2){
-        throw std::runtime_error("linear expects 2D input and weight tensors.");
-    }
-
-    Tensor out({x.shape()[0], weight.shape()[1]});
-    linear_out(x, weight, out);
-    return out;
+    return linear(x, weight, nullptr, nullptr);
 }
 
 void softmax_out(const Tensor& x, Tensor& out){

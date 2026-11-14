@@ -1,9 +1,9 @@
 #include "builtin_kernels.h"
 
 #include <tinyinfer/runtime/kernel_registry.h>
+#include <tinyinfer/runtime/threading_policy.h>
 #include <tinyinfer/compute/ops.h>
 
-#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -69,23 +69,6 @@ uint64_t as_cost(size_t value) noexcept{
     return static_cast<uint64_t>(value);
 }
 
-uint64_t saturating_add(uint64_t left, uint64_t right) noexcept{
-    const uint64_t maximum = std::numeric_limits<uint64_t>::max();
-    return left > maximum - right ? maximum : left + right;
-}
-
-uint64_t saturating_multiply(uint64_t left, uint64_t right) noexcept{
-    const uint64_t maximum = std::numeric_limits<uint64_t>::max();
-    if(left == 0 || right == 0){
-        return 0;
-    }
-    return left > maximum / right ? maximum : left * right;
-}
-
-uint64_t ceil_divide(uint64_t value, uint64_t divisor) noexcept{
-    return value / divisor + (value % divisor != 0 ? 1 : 0);
-}
-
 std::string require_arity(const KernelSelectionContext& context, size_t input_count){
     if(context.input_shapes.size() != input_count){
         return "expected " + std::to_string(input_count) + " inputs";
@@ -102,32 +85,6 @@ std::string require_linear_shape(const KernelSelectionContext& context){
         return "requires rank-2 input/weight/output and rank-1 bias";
     }
     return {};
-}
-
-uint64_t linear_work(const KernelSelectionContext& context) noexcept{
-    const Shape& input = context.input_shapes[0];
-    const Shape& weight = context.input_shapes[1];
-    return saturating_multiply(
-        saturating_multiply(as_cost(input[0]), as_cost(input[1])),
-        as_cost(weight[1])
-    );
-}
-
-uint64_t serial_linear_cost(const KernelSelectionContext& context){
-    return linear_work(context);
-}
-
-uint64_t threaded_linear_cost(const KernelSelectionContext& context){
-    const uint64_t workers = std::min(
-        as_cost(context.input_shapes[0][0]),
-        as_cost(context.effective_intra_op_threads)
-    );
-    const uint64_t useful_workers = std::max<uint64_t>(1, workers);
-    constexpr uint64_t task_overhead_score = 4096;
-    return saturating_add(
-        ceil_divide(linear_work(context), useful_workers),
-        saturating_multiply(task_overhead_score, useful_workers)
-    );
 }
 
 KernelMatch reject_or_accept(std::string rejection, uint64_t cost){
@@ -149,7 +106,12 @@ void register_builtin_kernels(KernelRegistry& registry){
                 if(const std::string shape = require_linear_shape(context); !shape.empty()){
                     return KernelMatch::reject(shape);
                 }
-                return KernelMatch::accept(serial_linear_cost(context));
+                return KernelMatch::accept(estimate_linear_cost(
+                    context.input_shapes[0][0],
+                    context.input_shapes[0][1],
+                    context.input_shapes[1][1],
+                    1
+                ));
             },
             .factory = [](const Node&, const KernelSelectionContext&){
                 return std::make_unique<SerialLinearKernel>();
@@ -166,10 +128,12 @@ void register_builtin_kernels(KernelRegistry& registry){
                 if(const std::string shape = require_linear_shape(context); !shape.empty()){
                     return KernelMatch::reject(shape);
                 }
-                if(context.input_shapes[0][0] < 2){
-                    return KernelMatch::reject("requires at least two output rows");
-                }
-                return KernelMatch::accept(threaded_linear_cost(context));
+                return KernelMatch::accept(estimate_linear_cost(
+                    context.input_shapes[0][0],
+                    context.input_shapes[0][1],
+                    context.input_shapes[1][1],
+                    context.effective_intra_op_threads
+                ));
             },
             .factory = [](const Node&, const KernelSelectionContext&){
                 return std::make_unique<ThreadedLinearKernel>();

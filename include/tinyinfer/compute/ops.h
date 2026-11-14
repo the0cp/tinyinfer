@@ -22,6 +22,12 @@ Tensor naive_matmul(const Tensor& a, const Tensor& b);
 Tensor fast_matmul(const Tensor& a, const Tensor& b);
 Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size);
 Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt);
+Tensor threadpool_matmul_transposed_b(
+    const Tensor& a,
+    const Tensor& bt,
+    ThreadPool& pool,
+    size_t num_tasks
+);
 Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_thread);
 Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, size_t num_tasks);
 Tensor add_bias(const Tensor& x, const Tensor& bias);
@@ -42,6 +48,19 @@ void threadpool_linear_out(
     Tensor& out,
     ThreadPool& pool,
     size_t num_tasks
+);
+void threadpool_linear_out(
+    const Tensor& x,
+    const Tensor& weight,
+    Tensor& out,
+    ThreadPool& pool,
+    size_t num_tasks
+);
+Tensor linear(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor* bias,
+    ThreadPool* pool
 );
 Tensor softmax(const Tensor& x);
 void softmax_out(const Tensor& x, Tensor& out);

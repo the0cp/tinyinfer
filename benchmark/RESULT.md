@@ -41,11 +41,11 @@
 
 | Shape                  | 1-thread selection / median | 4-thread selection / median |
 | ---------------------- | --------------------------- | --------------------------- |
-| `[1,32] × [32,32]`     | serial / 0.544 μs           | serial / 0.537 μs           |
-| `[4,32] × [32,32]`     | serial / 0.902 μs           | serial / 0.898 μs           |
-| `[64,128] × [128,128]` | serial / 100.598 μs         | threaded / 78.909 μs        |
-| `[256,64] × [64,64]`   | serial / 104.728 μs         | threaded / 80.411 μs        |
-| `[8,512] × [512,512]`  | serial / 200.117 μs         | threaded / 131.221 μs       |
+| `[1,32] × [32,32]`     | serial / 0.659 μs           | serial / 0.634 μs           |
+| `[4,32] × [32,32]`     | serial / 1.139 μs           | serial / 1.156 μs           |
+| `[64,128] × [128,128]` | serial / 201.746 μs         | threaded / 158.767 μs       |
+| `[256,64] × [64,64]`   | serial / 170.353 μs         | threaded / 147.488 μs       |
+| `[8,512] × [512,512]`  | serial / 308.403 μs         | threaded / 215.008 μs       |
 
 
 ## 5. Cache-backed causal Attention
@@ -95,7 +95,7 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release --parallel
 ctest --test-dir build-release --output-on-failure
 
-for name in matmul graph_scheduler session profiler tensor_storage memory_plan kernel_selection kv_cache paged_kv_cache; do
+for name in matmul inference_linear graph_scheduler session profiler tensor_storage memory_plan kernel_selection kv_cache paged_kv_cache; do
   ./build-release/bench_"$name"
 done
 ```

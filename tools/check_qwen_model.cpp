@@ -12,6 +12,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -219,7 +220,11 @@ int main(int argc, char** argv){
         }
 
         const size_t capacity = prompt.size() + test.generated.size() - 1;
-        tinyinfer::Qwen2Decoder decoder(std::move(model), capacity);
+        const size_t cpu_threads = std::max<size_t>(
+            1,
+            std::thread::hardware_concurrency()
+        );
+        tinyinfer::Qwen2Decoder decoder(std::move(model), capacity, cpu_threads);
         tinyinfer::Tensor logits = decoder.prefill(prompt);
 
         for(size_t step = 0; step < test.generated.size(); step++){
@@ -247,6 +252,7 @@ int main(int argc, char** argv){
         }
 
         std::cout << "generated_text=" << generated_text << "\n"
+                  << "cpu_threads=" << cpu_threads << "\n"
                   << "real Qwen2 text generation matches the reference\n";
         return 0;
     }catch(const std::exception& error){
