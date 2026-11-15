@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -70,6 +71,19 @@ Strides contiguous_strides(const Shape& shape){
     }
 
     return strides;
+}
+
+std::string shape_to_string(const Shape& shape){
+    std::ostringstream stream;
+    stream << "[";
+    for(size_t i = 0; i < shape.size(); i++){
+        if(i > 0){
+            stream << ", ";
+        }
+        stream << shape[i];
+    }
+    stream << "]";
+    return stream.str();
 }
 
 Tensor::Tensor(Shape shape)

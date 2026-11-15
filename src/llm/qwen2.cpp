@@ -703,15 +703,7 @@ Tensor Qwen2Decoder::last_token_logits(const Tensor& hidden_states) const{
 
     // Tied LM head: project the normalized hidden state to the 
     // vocabulary size using the token embedding weights
-    if(thread_pool_){
-        return threadpool_matmul_transposed_b(
-            normalized,
-            model_.token_embedding,
-            *thread_pool_,
-            thread_pool_->size()
-        );
-    }
-    return matmul_transposed_b(normalized, model_.token_embedding);
+    return matmul_bt(normalized, model_.token_embedding, thread_pool_.get());
 }
 
 Tensor Qwen2Decoder::prefill(std::span<const int64_t> token_ids){

@@ -45,10 +45,10 @@ static void bench_linear(
     Tensor serial_output({input.shape()[0], weight.shape()[1]});
     Tensor threaded_output({input.shape()[0], weight.shape()[1]});
     const double serial_ms = median_ms([&](){
-        linear_out(input, weight, serial_output);
+        linear_out(input, weight, nullptr, serial_output);
     });
     const double threaded_ms = median_ms([&](){
-        threadpool_linear_out(input, weight, threaded_output, pool, pool.size());
+        linear_out(input, weight, nullptr, threaded_output, &pool);
     });
     const bool threaded = prefer_threaded_linear(
         input.shape()[0],

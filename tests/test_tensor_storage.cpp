@@ -284,18 +284,6 @@ void test_zero_sized_tensor_has_safe_null_data(){
     expect(reshaped.buffer().get() == zero.buffer().get(), "empty reshape still shares storage");
 }
 
-void test_layout_policy_is_explicit_at_kernel_boundary(){
-    auto buffer = float_buffer({1, 2, 99, 3, 4, 99});
-    Tensor strided(buffer, 0, {2, 2}, Strides{3, 1});
-    Tensor identity({2, 2}, {1, 0, 0, 1});
-
-    Tensor reference = naive_matmul(strided, identity);
-    expect_close(reference.at({0, 0}), 1.0f);
-    expect_close(reference.at({1, 1}), 4.0f);
-
-    expect_throw([&](){ (void)fast_matmul(strided, identity); }, "contiguous");
-}
-
 void test_session_accepts_externally_backed_input(){
     Graph graph;
     graph.add_node("relu", OpType::ReLU, {"input"}, "output");
@@ -363,7 +351,6 @@ int main(){
         {"reshape_is_metadata_only", test_reshape_is_metadata_only},
         {"layout_validation", test_layout_validation},
         {"zero_sized_tensor_has_safe_null_data", test_zero_sized_tensor_has_safe_null_data},
-        {"layout_policy_is_explicit_at_kernel_boundary", test_layout_policy_is_explicit_at_kernel_boundary},
         {"session_accepts_externally_backed_input", test_session_accepts_externally_backed_input},
         {"model_writer_materializes_strided_tensor", test_model_writer_materializes_strided_tensor}
     };

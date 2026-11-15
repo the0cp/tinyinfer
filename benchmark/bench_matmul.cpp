@@ -33,13 +33,10 @@ static void bench(const std::string& name, Function&& function){
 
 int main(){
     Tensor a = random_tensor({512, 512});
-    Tensor b = random_tensor({512, 512});
-
-    bench("fast_matmul", [&](){ return fast_matmul(a, b); });
-    bench("blocked_matmul_32", [&](){ return blocked_matmul(a, b, 32); });
-    bench("parallel_matmul_8", [&](){ return parallel_matmul(a, b, 8); });
+    Tensor bt = random_tensor({512, 512});
 
     ThreadPool pool(8);
-    bench("threadpool_matmul_8", [&](){ return threadpool_matmul(a, b, pool, 8); });
+    bench("matmul_bt_serial", [&](){ return matmul_bt(a, bt); });
+    bench("matmul_bt_8", [&](){ return matmul_bt(a, bt, &pool); });
     return 0;
 }

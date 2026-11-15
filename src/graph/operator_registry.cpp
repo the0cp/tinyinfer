@@ -1,27 +1,11 @@
 #include <tinyinfer/graph/operator_registry.h>
 
-#include <sstream>
 #include <stdexcept>
 #include <utility>
 
 namespace tinyinfer{
 
 namespace{
-
-std::string shape_to_string(const Shape& shape){
-    std::ostringstream oss;
-    oss << "[";
-
-    for(size_t i = 0; i < shape.size(); i++){
-        if(i > 0){
-            oss << ", ";
-        }
-        oss << shape[i];
-    }
-
-    oss << "]";
-    return oss.str();
-}
 
 Shape infer_linear_shape(const ShapeInputs& inputs, std::string_view node_name){
     const Shape& x = *inputs.at(0);

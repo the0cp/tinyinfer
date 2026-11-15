@@ -199,53 +199,6 @@ void test_zero_byte_buffers_are_valid(){
     expect(memory.arena_bytes() == 0, "zero-byte arena size");
 }
 
-class LegacyReluKernel final : public OpKernel{
-public:
-    void compute(OpKernelContext& context) const override{
-        context.set_output(relu(context.input(0)));
-    }
-};
-
-void test_legacy_set_output_is_a_correctness_fallback(){
-    OperatorRegistry operators;
-    KernelRegistry kernels(false);
-    kernels.register_kernel(
-        OpType::ReLU,
-        KernelCandidate{
-            .name = "test.legacy_relu",
-            .threading = KernelThreading::Serial,
-            .priority = 0,
-            .match = [](const KernelSelectionContext&){ return KernelMatch::accept(0); },
-            .factory = [](const Node&, const KernelSelectionContext&){
-                return std::make_unique<LegacyReluKernel>();
-            }
-        }
-    );
-
-    Graph graph = make_relu_chain(1);
-    graph.resolve("input", {1, 4}, "v0", operators);
-    SessionState state = SessionState::build(
-        std::move(graph),
-        operators,
-        kernels,
-        MemoryPlanningPolicy::SequentialReuse
-    );
-
-    RunProfiler profiler(state.execution_plan());
-    ExecutionFrame frame(state, &profiler);
-    Tensor input({1, 4}, {-1.0f, 2.0f, -3.0f, 4.0f});
-    frame.bind_input(state.execution_plan().input_index(), input);
-    SequentialExecutor executor;
-    executor.execute(state, frame, &profiler);
-    profiler.finish(true);
-
-    expect_result(frame.fetch(state.execution_plan().output_index()));
-    const RunProfile profile = profiler.snapshot();
-    expect(profile.managed_buffer_allocations == 1, "only the arena block is runtime-managed");
-    expect(profile.legacy_output_submissions == 1, "legacy submission is a separate event");
-    expect(profile.planned_value_count == 1, "legacy output still lands in planned storage");
-}
-
 void test_policy_validation(){
     auto session = make_chain_session(4);
     expect_throw([&](){
@@ -274,15 +227,8 @@ void test_output_context_contract(){
     expect(&context.output() == &first, "output requests are idempotent");
     first.fill(7.0f);
     context.validate_output();
-    expect_throw([&](){ context.set_output(Tensor({1, 4})); }, "already");
     first = Tensor({1, 4});
     expect_throw([&](){ context.validate_output(); }, "replaced");
-
-    ExecutionFrame legacy_frame(state);
-    OpKernelContext legacy(node, legacy_frame);
-    legacy.set_output(Tensor({1, 4}));
-    expect_throw([&](){ (void)legacy.output(); }, "mix");
-    legacy.validate_output();
 }
 
 class ReplacingKernel final : public OpKernel{
@@ -324,32 +270,11 @@ void test_executors_validate_kernel_binding(){
     expect_throw([&](){ parallel.execute(state, parallel_frame); }, "replaced");
 }
 
-void test_legacy_alias_is_not_an_allocation(){
-    for(bool planned : {false, true}){
-        SessionOptions options;
-        options.enable_memory_planning = planned;
-        auto session = make_chain_session(1, options);
-        const auto& state = session->session_state();
-        RunProfiler profiler(state.execution_plan());
-        ExecutionFrame frame(state, &profiler);
-        Tensor input({1, 4}, {1, 2, 3, 4});
-        frame.bind_input(state.execution_plan().input_index(), input);
-        OpKernelContext context(state.execution_plan().nodes().front(), frame);
-        context.set_output(input); // shared handle, no new payload allocation
-        context.validate_output();
-        profiler.finish(true);
-        const auto profile = profiler.snapshot();
-        expect(profile.managed_buffer_allocations == (planned ? 1u : 0u), "do not infer allocation from submission");
-        expect(profile.legacy_output_submissions == 1, "count the submission");
-        expect(frame.fetch(state.execution_plan().output_index()).data()[2] == 3, "copy/alias result");
-    }
-}
-
 void test_out_alias_and_empty_dimensions(){
     Tensor input({1, 2}, {2, 3});
     Tensor weight({2, 2}, {1, 0, 0, 1});
     Tensor bias({2}, {1, 1});
-    expect_throw([&](){ linear_out(input, weight, bias, input); }, "overlap");
+    expect_throw([&](){ linear_out(input, weight, &bias, input); }, "overlap");
     expect(input.data()[0] == 2 && input.data()[1] == 3, "reject before clearing input");
     expect_throw([&](){ relu_out(input, input); }, "overlap");
     expect_throw([&](){ add_out(input, input, input); }, "overlap");
@@ -373,13 +298,13 @@ void test_out_alias_and_empty_dimensions(){
     Tensor empty_weight({0, 2});
     Tensor output({2, 2});
     output.fill(99.0f);
-    linear_out(empty_x, empty_weight, bias, output);
+    linear_out(empty_x, empty_weight, &bias, output);
     for(size_t i = 0; i < output.numel(); i++){
         expect(output.data()[i] == 1.0f, "zero reduction produces bias, not stale storage");
     }
     Tensor zero_columns({2, 0});
     Tensor zero_bias({0});
-    linear_out(Tensor({2, 2}), Tensor({2, 0}), zero_bias, zero_columns);
+    linear_out(Tensor({2, 2}), Tensor({2, 0}), &zero_bias, zero_columns);
 }
 
 void test_mixed_size_reuse(){
@@ -416,7 +341,6 @@ int main(){
         {"policy_validation", test_policy_validation},
         {"output_context_contract", test_output_context_contract},
         {"executors_validate_kernel_binding", test_executors_validate_kernel_binding},
-        {"legacy_alias_is_not_an_allocation", test_legacy_alias_is_not_an_allocation},
         {"out_alias_and_empty_dimensions", test_out_alias_and_empty_dimensions},
         {"mixed_size_reuse", test_mixed_size_reuse},
         {"sequential_reuse_and_inclusive_lifetimes", test_sequential_reuse_and_inclusive_lifetimes},
@@ -425,8 +349,7 @@ int main(){
         {"parallel_uses_conservative_dedicated_blocks", test_parallel_uses_conservative_dedicated_blocks},
         {"outputs_survive_their_run_arena", test_outputs_survive_their_run_arena},
         {"concurrent_runs_have_private_arenas", test_concurrent_runs_have_private_arenas},
-        {"zero_byte_buffers_are_valid", test_zero_byte_buffers_are_valid},
-        {"legacy_set_output_is_a_correctness_fallback", test_legacy_set_output_is_a_correctness_fallback}
+        {"zero_byte_buffers_are_valid", test_zero_byte_buffers_are_valid}
     };
 
     size_t passed = 0;

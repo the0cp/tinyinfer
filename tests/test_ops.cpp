@@ -136,60 +136,41 @@ void test_tensor_basics(){
     expect_throw([](){ Tensor({std::numeric_limits<size_t>::max(), 2}); }, "overflows");
 }
 
-void test_add_relu_and_transpose(){
+void test_add_and_relu(){
     Tensor a({2, 2}, {-1.0f, 2.0f, 3.0f, -4.0f});
     Tensor b({2, 2}, {2.0f, 3.0f, 4.0f, 5.0f});
     expect_tensor(add(a, b), {2, 2}, {1.0f, 5.0f, 7.0f, 1.0f});
-    expect_tensor(relu(a), {2, 2}, {0.0f, 2.0f, 3.0f, 0.0f});
-    expect_tensor(transpose_2d(a), {2, 2}, {-1.0f, 3.0f, 2.0f, -4.0f});
+    Tensor activated({2, 2});
+    relu_out(a, activated);
+    expect_tensor(activated, {2, 2}, {0.0f, 2.0f, 3.0f, 0.0f});
     expect_throw([&](){ (void)add(a, Tensor({1}, {1.0f})); }, "shape mismatch");
-    expect_throw([](){ (void)transpose_2d(Tensor({1})); }, "2D");
 }
 
 void verify_matmul_result(const Tensor& result){
     expect_tensor(result, {2, 2}, {22.0f, 28.0f, 49.0f, 64.0f});
 }
 
-void test_matmul_implementations(){
+void test_matmul_bt(){
     Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
-    Tensor b({3, 2}, {1, 2, 3, 4, 5, 6});
-    Tensor bt = transpose_2d(b);
-
-    verify_matmul_result(naive_matmul(a, b));
-    verify_matmul_result(fast_matmul(a, b));
-    verify_matmul_result(blocked_matmul(a, b, 2));
-    verify_matmul_result(matmul_transposed_b(a, bt));
-    verify_matmul_result(parallel_matmul(a, b, 8));
+    Tensor bt({2, 3}, {1, 3, 5, 2, 4, 6});
+    verify_matmul_result(matmul_bt(a, bt));
 
     ThreadPool pool(2);
-    verify_matmul_result(threadpool_matmul(a, b, pool, 8));
-    verify_matmul_result(threadpool_matmul_transposed_b(a, bt, pool, 8));
-
-    expect_throw([&](){ (void)blocked_matmul(a, b, 0); }, "non-zero");
-    expect_throw(
-        [&](){ (void)fast_matmul(a, Tensor({4, 1})); },
-        "shape mismatch"
-    );
+    verify_matmul_result(matmul_bt(a, bt, &pool));
 
     Tensor zero_rows({0, 3});
-    expect(threadpool_matmul(zero_rows, b, pool, 2).shape() == Shape({0, 2}), "zero rows");
     pool.parallel_for(1, 1, [&](size_t, size_t){
         expect(
-            threadpool_matmul_transposed_b(zero_rows, bt, pool, 2).shape() ==
-                Shape({0, 2}),
-            "transposed matmul zero rows"
+            matmul_bt(zero_rows, bt, &pool).shape() == Shape({0, 2}),
+            "matmul_bt zero rows"
         );
     });
 
     Tensor zero_inner({2, 0});
     Tensor empty_weights({3, 0});
     const std::vector<float> zeros(6, 0.0f);
-    expect_tensor(matmul_transposed_b(zero_inner, empty_weights), {2, 3}, zeros);
-    expect_tensor(
-        threadpool_matmul_transposed_b(zero_inner, empty_weights, pool, 8),
-        {2, 3},
-        zeros
-    );
+    expect_tensor(matmul_bt(zero_inner, empty_weights), {2, 3}, zeros);
+    expect_tensor(matmul_bt(zero_inner, empty_weights, &pool), {2, 3}, zeros);
 }
 
 void test_linear_and_softmax(){
@@ -197,16 +178,21 @@ void test_linear_and_softmax(){
     Tensor weight({2, 3}, {1, 0, -1, 0, 1, 1});
     Tensor bias({3}, {0, 0, 0});
 
-    Tensor logits = linear(input, weight, bias);
+    Tensor logits = linear(input, weight, &bias);
     expect_tensor(logits, {1, 3}, {1.0f, 2.0f, 1.0f});
 
-    Tensor probabilities = softmax(logits);
+    Tensor probabilities(logits.shape());
+    softmax_out(logits, probabilities);
     expect_close(
         probabilities.data()[0] + probabilities.data()[1] + probabilities.data()[2],
         1.0f
     );
     expect(probabilities.data()[1] > probabilities.data()[0], "softmax ordering");
-    expect_throw([](){ (void)softmax(Tensor({2, 0})); }, "non-empty");
+    expect_throw([](){
+        Tensor input({2, 0});
+        Tensor output({2, 0});
+        softmax_out(input, output);
+    }, "non-empty");
 
 }
 
@@ -228,14 +214,14 @@ void test_bfloat16_weight_ops(){
         {1.0f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f}
     );
     const Tensor bias = bfloat16_tensor({3}, {0.5f, -0.5f, 1.0f});
-    expect_tensor(linear(input, weight, bias), {1, 3}, {1.5f, 1.5f, 2.0f});
+    expect_tensor(linear(input, weight, &bias), {1, 3}, {1.5f, 1.5f, 2.0f});
 
     const Tensor transposed_weight = bfloat16_tensor(
         {3, 2},
         {1.0f, 0.0f, 0.0f, 1.0f, 1.0f, -1.0f}
     );
     expect_tensor(
-        matmul_transposed_b(input, transposed_weight),
+        matmul_bt(input, transposed_weight),
         {1, 3},
         {1.0f, 2.0f, -1.0f}
     );
@@ -243,7 +229,7 @@ void test_bfloat16_weight_ops(){
     ThreadPool pool(2);
     Tensor threaded({2, 3});
     const Tensor two_rows({2, 2}, {1.0f, 2.0f, 1.0f, 2.0f});
-    threadpool_linear_out(two_rows, weight, bias, threaded, pool, 2);
+    linear_out(two_rows, weight, &bias, threaded, &pool);
     expect_tensor(
         threaded,
         {2, 3},
@@ -251,15 +237,15 @@ void test_bfloat16_weight_ops(){
     );
 
     Tensor threaded_single({1, 3});
-    threadpool_linear_out(input, weight, bias, threaded_single, pool, 2);
+    linear_out(input, weight, &bias, threaded_single, &pool);
     expect_tensor(threaded_single, {1, 3}, {1.5f, 1.5f, 2.0f});
 
     Tensor threaded_no_bias({1, 3});
-    threadpool_linear_out(input, weight, threaded_no_bias, pool, 2);
+    linear_out(input, weight, nullptr, threaded_no_bias, &pool);
     expect_tensor(threaded_no_bias, {1, 3}, {1.0f, 2.0f, 1.0f});
 
     expect_tensor(
-        threadpool_matmul_transposed_b(input, transposed_weight, pool, 2),
+        matmul_bt(input, transposed_weight, &pool),
         {1, 3},
         {1.0f, 2.0f, -1.0f}
     );
@@ -281,11 +267,11 @@ void test_threadpool_linear_worker_rejection_preserves_output(){
 
     pool.parallel_for(1, 1, [&](size_t, size_t){
         expect_throw(
-            [&](){ threadpool_linear_out(single_row, weight, bias, single_output, pool, 2); },
+            [&](){ linear_out(single_row, weight, &bias, single_output, &pool); },
             "worker cannot wait"
         );
         expect_throw(
-            [&](){ threadpool_linear_out(two_rows, weight, row_output, pool, 2); },
+            [&](){ linear_out(two_rows, weight, nullptr, row_output, &pool); },
             "worker cannot wait"
         );
     });
@@ -432,7 +418,7 @@ public:
 
     void compute(OpKernelContext& context) const override{
         calls_.fetch_add(1, std::memory_order_relaxed);
-        context.set_output(relu(context.input(0)));
+        relu_out(context.input(0), context.output());
     }
 
 private:
@@ -601,8 +587,8 @@ struct TestCase{
 int main(){
     const std::vector<TestCase> tests{
         {"tensor_basics", test_tensor_basics},
-        {"add_relu_and_transpose", test_add_relu_and_transpose},
-        {"matmul_implementations", test_matmul_implementations},
+        {"add_and_relu", test_add_and_relu},
+        {"matmul_bt", test_matmul_bt},
         {"linear_and_softmax", test_linear_and_softmax},
         {"bfloat16_weight_ops", test_bfloat16_weight_ops},
         {"threadpool_linear_worker_rejection_preserves_output", test_threadpool_linear_worker_rejection_preserves_output},

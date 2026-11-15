@@ -67,7 +67,6 @@ struct RunProfile{
     // metadata, allocator overhead and RSS; these are not peak-memory counters.
     size_t managed_buffer_allocations = 0;
     size_t managed_allocated_bytes = 0;
-    size_t legacy_output_submissions = 0;
     size_t planned_value_count = 0;
     size_t memory_reuse_count = 0;
     std::string error;
@@ -95,7 +94,6 @@ public:
     void value_allocated(ValueIndex index, size_t bytes);
     void value_released(ValueIndex index, size_t bytes);
     void managed_buffer_allocated(size_t bytes);
-    void legacy_output_submitted();
     void memory_plan_applied(
         size_t buffer_count,
         size_t arena_bytes,

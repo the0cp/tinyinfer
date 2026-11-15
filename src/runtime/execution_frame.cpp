@@ -2,31 +2,10 @@
 
 #include <tinyinfer/runtime/profiler.h>
 
-#include <cstring>
 #include <sstream>
 #include <stdexcept>
-#include <utility>
 
 namespace tinyinfer{
-
-namespace{
-
-std::string shape_to_string(const Shape& shape){
-    std::ostringstream oss;
-    oss << "[";
-
-    for(size_t i = 0; i < shape.size(); i++){
-        if(i > 0){
-            oss << ", ";
-        }
-        oss << shape[i];
-    }
-
-    oss << "]";
-    return oss.str();
-}
-
-}
 
 ExecutionFrame::ExecutionFrame(const SessionState& session_state, RunProfiler* profiler)
     : session_state_(session_state), profiler_(profiler), values_(session_state.value_count()){
@@ -145,52 +124,6 @@ const Tensor& ExecutionFrame::value(ValueIndex index) const{
         "ExecutionFrame value is unavailable: " +
         std::string(session_state_.execution_plan().value_names().name(index))
     );
-}
-
-void ExecutionFrame::set_value(ValueIndex index, Tensor tensor){
-    ValueSlot& slot = values_.at(index);
-
-    if(slot.has_value()){
-        throw std::logic_error(
-            "ExecutionFrame value already exists: " +
-            std::string(session_state_.execution_plan().value_names().name(index))
-        );
-    }
-
-    const ValueInfo& info = session_state_.execution_plan().value_info(index);
-    const Shape& expected = info.shape;
-
-    if(tensor.shape() != expected || tensor.dtype() != info.dtype){
-        throw std::logic_error(
-            "Kernel produced an unexpected shape or data type for value '" +
-            std::string(session_state_.execution_plan().value_names().name(index)) + "'."
-        );
-    }
-
-    const MemoryPlan& memory_plan = session_state_.memory_plan();
-    if(arena_ && memory_plan.has_allocation(index)){
-        // Compatibility path for third-party kernels using set_output(). New
-        // kernels should write directly to OpKernelContext::output().
-        Tensor source = tensor.is_contiguous() ? tensor : tensor.clone();
-        if(profiler_ && !tensor.is_contiguous()){
-            profiler_->managed_buffer_allocated(source.buffer()->size_bytes());
-        }
-        Tensor& destination = allocate_output(index);
-        if(info.byte_size != 0){
-            std::memmove(destination.data(), source.data(), info.byte_size);
-        }
-        if(profiler_){
-            profiler_->legacy_output_submitted();
-        }
-        return;
-    }
-
-    slot.owned = std::move(tensor);
-
-    if(profiler_){
-        profiler_->legacy_output_submitted();
-        profiler_->value_allocated(index, info.byte_size);
-    }
 }
 
 void ExecutionFrame::release(ValueIndex index){

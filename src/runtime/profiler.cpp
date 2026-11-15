@@ -123,7 +123,6 @@ std::string RunProfile::summary() const{
         << "\n";
     oss << "  managed memory: buffer_allocations=" << managed_buffer_allocations
         << ", allocated_bytes=" << managed_allocated_bytes
-        << ", legacy_submissions=" << legacy_output_submissions
         << ", planned_values=" << planned_value_count
         << ", reuses=" << memory_reuse_count
         << "\n";
@@ -386,14 +385,6 @@ void RunProfiler::managed_buffer_allocated(size_t bytes){
 
     profile_.managed_buffer_allocations++;
     profile_.managed_allocated_bytes += bytes;
-}
-
-void RunProfiler::legacy_output_submitted(){
-    std::lock_guard<std::mutex> lock(mutex_);
-    if(profile_.legacy_output_submissions == std::numeric_limits<size_t>::max()){
-        throw std::overflow_error("Profiler legacy submission counter overflow.");
-    }
-    profile_.legacy_output_submissions++;
 }
 
 void RunProfiler::memory_plan_applied(

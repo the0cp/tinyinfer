@@ -15,7 +15,12 @@ namespace{
 class SerialLinearKernel final : public OpKernel{
 public:
     void compute(OpKernelContext& context) const override{
-        linear_out(context.input(0), context.input(1), context.input(2), context.output());
+        linear_out(
+            context.input(0),
+            context.input(1),
+            &context.input(2),
+            context.output()
+        );
     }
 };
 
@@ -28,13 +33,12 @@ public:
                 "The compiled threaded Linear kernel has no intra-op ThreadPool."
             );
         }
-        threadpool_linear_out(
+        linear_out(
             context.input(0),
             context.input(1),
-            context.input(2),
+            &context.input(2),
             context.output(),
-            *pool,
-            pool->size()
+            pool
         );
     }
 };

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace tinyinfer{
@@ -16,6 +17,7 @@ using Strides = std::vector<size_t>;
 size_t tensor_numel(const Shape& shape);
 size_t tensor_bytes(const Shape& shape, DataType dtype = DataType::Float32);
 Strides contiguous_strides(const Shape& shape);
+std::string shape_to_string(const Shape& shape);
 
 class Tensor{
 public:

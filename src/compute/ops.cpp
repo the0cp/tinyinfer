@@ -69,11 +69,6 @@ void require_weight(const Tensor& weight, const char* operation){
     }
 }
 
-void require_disjoint_weight(const Tensor& weight, const Tensor& out, const char* operation){
-    require_weight(weight, operation);
-    require_disjoint_storage(weight, out, operation);
-}
-
 float as_float(float value) noexcept{
     return value;
 }
@@ -112,22 +107,6 @@ LinearShape validate_linear(
     require_weight(weight, "linear");
     if(bias != nullptr){
         require_weight(*bias, "linear");
-    }
-    return shape;
-}
-
-LinearShape validate_linear_out(
-    const Tensor& x,
-    const Tensor& weight,
-    const Tensor* bias,
-    Tensor& out
-){
-    const LinearShape shape = validate_linear(x, weight, bias);
-    require_output(out, Shape{shape.rows, shape.out_features}, "linear");
-    require_disjoint_storage(x, out, "linear");
-    require_disjoint_storage(weight, out, "linear");
-    if(bias != nullptr){
-        require_disjoint_storage(*bias, out, "linear");
     }
     return shape;
 }
@@ -175,7 +154,7 @@ void linear_kernel(
     }
 }
 
-void run_linear(
+void linear_range(
     const Tensor& x,
     const Tensor& weight,
     const Tensor* bias,
@@ -228,55 +207,21 @@ void matmul_bt_kernel(
 
 void validate_matmul_bt(const Tensor& a, const Tensor& bt){
     if(a.dim() != 2 || bt.dim() != 2){
-        throw std::runtime_error("matmul_transposed_b only supports 2D tensors.");
+        throw std::runtime_error("matmul_bt only supports 2D tensors.");
     }
     if(bt.shape()[1] != a.shape()[1]){
-        throw std::runtime_error("matmul_transposed_b shape mismatch.");
+        throw std::runtime_error("matmul_bt shape mismatch.");
     }
-    require_input(a, "matmul_transposed_b");
-    require_weight(bt, "matmul_transposed_b");
+    require_input(a, "matmul_bt");
+    require_weight(bt, "matmul_bt");
 }
 
-Tensor matmul_bt(
-    const Tensor& a,
-    const Tensor& bt,
-    ThreadPool* pool,
-    size_t num_tasks
-){
-    validate_matmul_bt(a, bt);
-    const size_t rows = a.shape()[0];
-    const size_t inner_size = a.shape()[1];
-    const size_t cols = bt.shape()[0];
-    Tensor out({rows, cols});
-    if(out.numel() == 0 || inner_size == 0){
-        return out;
-    }
-
-    const auto run = [&](const auto* weights){
-        const auto kernel = [&](size_t col_begin, size_t col_end){
-            matmul_bt_kernel(a, weights, out, inner_size, col_begin, col_end);
-        };
-        if(pool != nullptr){
-            pool->parallel_for(cols, num_tasks, kernel);
-        }else{
-            kernel(0, cols);
-        }
-    };
-    if(bt.dtype() == DataType::Float32){
-        run(bt.data());
-    }else{
-        run(bt.bfloat16_data());
-    }
-    return out;
-}
-
-void parallel_linear(
+void linear_parallel(
     const Tensor& x,
     const Tensor& weight,
     const Tensor* bias,
     Tensor& out,
     ThreadPool& pool,
-    size_t num_tasks,
     const LinearShape& shape
 ){
     if(out.numel() == 0){
@@ -286,9 +231,9 @@ void parallel_linear(
     if(shape.rows > 1){
         pool.parallel_for(
             shape.rows,
-            num_tasks,
+            pool.size(),
             [&](size_t row_begin, size_t row_end){
-                run_linear(
+                linear_range(
                     x, weight, bias, out, shape,
                     row_begin, row_end, 0, shape.out_features
                 );
@@ -299,14 +244,34 @@ void parallel_linear(
 
     pool.parallel_for(
         shape.out_features,
-        num_tasks,
+        pool.size(),
         [&](size_t col_begin, size_t col_end){
-            run_linear(
+            linear_range(
                 x, weight, bias, out, shape,
                 0, 1, col_begin, col_end
             );
         }
     );
+}
+
+void run_linear(
+    const Tensor& x,
+    const Tensor& weight,
+    const Tensor* bias,
+    Tensor& out,
+    ThreadPool* pool,
+    const LinearShape& shape
+){
+    if(pool != nullptr){
+        linear_parallel(x, weight, bias, out, *pool, shape);
+        return;
+    }
+    if(out.numel() != 0){
+        linear_range(
+            x, weight, bias, out, shape,
+            0, shape.rows, 0, shape.out_features
+        );
+    }
 }
 
 }
@@ -335,24 +300,6 @@ Tensor add(const Tensor& a, const Tensor& b){
     return out;
 }
 
-Tensor transpose_2d(const Tensor& x){
-    if(x.dim() != 2){
-        throw std::runtime_error("transpose_2d expects a 2D tensor.");
-    }
-
-    const size_t rows = x.shape()[0];
-    const size_t cols = x.shape()[1];
-    Tensor out({cols, rows});
-
-    for(size_t i = 0; i < rows; i++){
-        for(size_t j = 0; j < cols; j++){
-            out.data()[j * rows + i] = x.data()[i * cols + j];
-        }
-    }
-
-    return out;
-}
-
 void relu_out(const Tensor& x, Tensor& out){
     require_output(out, x.shape(), "relu");
     require_disjoint_input(x, out, "relu");
@@ -365,13 +312,10 @@ void relu_out(const Tensor& x, Tensor& out){
     }
 }
 
-Tensor relu(const Tensor& x){
-    Tensor out(x.shape());
-    relu_out(x, out);
-
-    return out;
-}
-
+#if 0
+// Historical 512 x 512 MatMul experiments, kept together for study.
+// Median of 7 runs: fast 13 ms, blocked 63 ms, parallel 6 ms,
+// thread pool 6 ms. Naive was not benchmarked.
 Tensor naive_matmul(const Tensor& a, const Tensor& b){
     if(a.dim() != 2 || b.dim() != 2){
         throw std::runtime_error("matmul only supports 2D tensors.");
@@ -484,19 +428,6 @@ Tensor blocked_matmul(const Tensor& a, const Tensor& b, size_t block_size){
     return out;
 }
 
-Tensor matmul_transposed_b(const Tensor& a, const Tensor& bt){
-    return matmul_bt(a, bt, nullptr, 1);
-}
-
-Tensor threadpool_matmul_transposed_b(
-    const Tensor& a,
-    const Tensor& bt,
-    ThreadPool& pool,
-    size_t num_tasks
-){
-    return matmul_bt(a, bt, &pool, num_tasks);
-}
-
 Tensor parallel_matmul(const Tensor& a, const Tensor& b, size_t num_threads){
     if(a.dim() != 2 || b.dim() != 2){
         throw std::runtime_error("parallel_matmul only supports 2D tensors.");
@@ -590,43 +521,44 @@ Tensor threadpool_matmul(const Tensor& a, const Tensor& b, ThreadPool& pool, siz
     });
     return out;
 }
+#endif
 
-Tensor add_bias(const Tensor& x, const Tensor& bias){
-    if(x.dim() != 2){
-        throw std::runtime_error("add_bias expects x to be 2D.");
+Tensor matmul_bt(const Tensor& a, const Tensor& bt, ThreadPool* pool){
+    validate_matmul_bt(a, bt);
+    const size_t rows = a.shape()[0];
+    const size_t inner_size = a.shape()[1];
+    const size_t cols = bt.shape()[0];
+    Tensor out({rows, cols});
+    if(out.numel() == 0 || inner_size == 0){
+        return out;
     }
 
-    if(bias.dim() != 1){
-        throw std::runtime_error("add_bias expects bias to be 1D.");
-    }
-
-    const size_t batch = x.shape()[0];
-    const size_t features = x.shape()[1];
-
-    if(bias.shape()[0] != features){
-        throw std::runtime_error("bias shape mismatch.");
-    }
-
-    Tensor out(x.shape());
-
-    for(size_t i = 0; i < batch; i++){
-        for(size_t j = 0; j < features; j++){
-            out.data()[i * features + j] = x.data()[i * features + j] + bias.data()[j];
+    const auto run = [&](const auto* weights){
+        const auto kernel = [&](size_t col_begin, size_t col_end){
+            matmul_bt_kernel(a, weights, out, inner_size, col_begin, col_end);
+        };
+        if(pool != nullptr){
+            pool->parallel_for(cols, pool->size(), kernel);
+        }else{
+            kernel(0, cols);
         }
+    };
+    if(bt.dtype() == DataType::Float32){
+        run(bt.data());
+    }else{
+        run(bt.bfloat16_data());
     }
-
     return out;
 }
 
-void embedding_out(
+Tensor embedding(
     const Tensor& weight,
-    std::span<const int64_t> token_ids,
-    Tensor& out
+    std::span<const int64_t> token_ids
 ){
     if(weight.dim() != 2){
         throw std::runtime_error("embedding expects a 2D weight tensor.");
     }
-    
+
     const size_t vocabulary_size = weight.shape()[0];
     const size_t hidden_size = weight.shape()[1];
 
@@ -640,8 +572,8 @@ void embedding_out(
         }
     }
 
-    require_output(out, {token_ids.size(), hidden_size}, "embedding");
-    require_disjoint_weight(weight, out, "embedding");
+    require_weight(weight, "embedding");
+    Tensor out({token_ids.size(), hidden_size});
 
     if(weight.dtype() == DataType::Float32){
         for(size_t token = 0; token < token_ids.size(); token++){
@@ -662,61 +594,24 @@ void embedding_out(
             }
         }
     }
-}
-
-Tensor embedding(const Tensor& weight, std::span<const int64_t> token_ids){
-    if(weight.dim() != 2){
-        throw std::runtime_error("embedding expects a 2D weight tensor.");
-    }
-
-    Tensor out({token_ids.size(), weight.shape()[1]});
-    embedding_out(weight, token_ids, out);
     return out;
 }
 
-void linear_out(const Tensor& x, const Tensor& weight, const Tensor& bias, Tensor& out){
-    const LinearShape shape = validate_linear_out(x, weight, &bias, out);
-    if(out.numel() == 0){
-        return;
-    }
-    run_linear(
-        x, weight, &bias, out, shape,
-        0, shape.rows, 0, shape.out_features
-    );
-}
-
-void linear_out(const Tensor& x, const Tensor& weight, Tensor& out){
-    const LinearShape shape = validate_linear_out(x, weight, nullptr, out);
-    if(out.numel() == 0){
-        return;
-    }
-    run_linear(
-        x, weight, nullptr, out, shape,
-        0, shape.rows, 0, shape.out_features
-    );
-}
-
-void threadpool_linear_out(
+void linear_out(
     const Tensor& x,
     const Tensor& weight,
-    const Tensor& bias,
+    const Tensor* bias,
     Tensor& out,
-    ThreadPool& pool,
-    size_t num_tasks
+    ThreadPool* pool
 ){
-    const LinearShape shape = validate_linear_out(x, weight, &bias, out);
-    parallel_linear(x, weight, &bias, out, pool, num_tasks, shape);
-}
-
-void threadpool_linear_out(
-    const Tensor& x,
-    const Tensor& weight,
-    Tensor& out,
-    ThreadPool& pool,
-    size_t num_tasks
-){
-    const LinearShape shape = validate_linear_out(x, weight, nullptr, out);
-    parallel_linear(x, weight, nullptr, out, pool, num_tasks, shape);
+    const LinearShape shape = validate_linear(x, weight, bias);
+    require_output(out, Shape{shape.rows, shape.out_features}, "linear");
+    require_disjoint_storage(x, out, "linear");
+    require_disjoint_storage(weight, out, "linear");
+    if(bias != nullptr){
+        require_disjoint_storage(*bias, out, "linear");
+    }
+    run_linear(x, weight, bias, out, pool, shape);
 }
 
 Tensor linear(
@@ -727,23 +622,8 @@ Tensor linear(
 ){
     const LinearShape shape = validate_linear(x, weight, bias);
     Tensor out({shape.rows, shape.out_features});
-    if(pool != nullptr){
-        parallel_linear(x, weight, bias, out, *pool, pool->size(), shape);
-    }else if(out.numel() != 0){
-        run_linear(
-            x, weight, bias, out, shape,
-            0, shape.rows, 0, shape.out_features
-        );
-    }
+    run_linear(x, weight, bias, out, pool, shape);
     return out;
-}
-
-Tensor linear(const Tensor& x, const Tensor& weight, const Tensor& bias){
-    return linear(x, weight, &bias, nullptr);
-}
-
-Tensor linear(const Tensor& x, const Tensor& weight){
-    return linear(x, weight, nullptr, nullptr);
 }
 
 void softmax_out(const Tensor& x, Tensor& out){
@@ -785,18 +665,10 @@ void softmax_out(const Tensor& x, Tensor& out){
     }
 }
 
-Tensor softmax(const Tensor& x){
-    Tensor out(x.shape());
-    softmax_out(x, out);
-
-    return out;
-}
-
-void rms_norm_out(
+Tensor rms_norm(
     const Tensor& x,
     const Tensor& weight,
-    float epsilon,
-    Tensor& out
+    float epsilon
 ){
     if(x.dim() == 0 || weight.dim() != 1){
         throw std::runtime_error("rms_norm expects a tensor and a 1D weight.");
@@ -812,11 +684,11 @@ void rms_norm_out(
         throw std::runtime_error("rms_norm epsilon must be finite and positive.");
     }
 
-    require_output(out, x.shape(), "rms_norm");
-    require_disjoint_input(x, out, "rms_norm");
-    require_disjoint_weight(weight, out, "rms_norm");
+    require_input(x, "rms_norm");
+    require_weight(weight, "rms_norm");
 
     const size_t rows = x.numel() / features;
+    Tensor out(x.shape());
 
     for(size_t row = 0; row < rows; row++){
         const float* source = x.data() + row * features;
@@ -843,32 +715,22 @@ void rms_norm_out(
             }
         }
     }
-}
-
-Tensor rms_norm(const Tensor& x, const Tensor& weight, float epsilon){
-    Tensor out(x.shape());
-    rms_norm_out(x, weight, epsilon, out);
     return out;
 }
 
-void silu_mul_out(const Tensor& gate, const Tensor& up, Tensor& out){
+Tensor silu_mul(const Tensor& gate, const Tensor& up){
     if(gate.shape() != up.shape()){
         throw std::runtime_error("silu_mul input shape mismatch.");
     }
 
-    require_output(out, gate.shape(), "silu_mul");
-    require_disjoint_input(gate, out, "silu_mul");
-    require_disjoint_input(up, out, "silu_mul");
+    require_input(gate, "silu_mul");
+    require_input(up, "silu_mul");
 
+    Tensor out(gate.shape());
     for(size_t i = 0; i < gate.numel(); i++){
         const float value = gate.data()[i];
         out.data()[i] = value / (1.0f + std::exp(-value)) * up.data()[i];
     }
-}
-
-Tensor silu_mul(const Tensor& gate, const Tensor& up){
-    Tensor out(gate.shape());
-    silu_mul_out(gate, up, out);
     return out;
 }
 

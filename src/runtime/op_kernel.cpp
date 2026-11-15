@@ -4,8 +4,6 @@
 #include <tinyinfer/runtime/execution_plan.h>
 
 #include <stdexcept>
-#include <utility>
-
 namespace tinyinfer{
 
 OpKernelContext::OpKernelContext(
@@ -30,23 +28,12 @@ const Tensor& OpKernelContext::input(size_t index) const{
 }
 
 Tensor& OpKernelContext::output(){
-    if(legacy_output_set_){
-        throw std::logic_error("Cannot mix output() with set_output().");
-    }
     if(!output_){
         output_ = &frame_.allocate_output(node_plan_.output);
         output_buffer_ = output_->buffer();
         output_offset_ = output_->byte_offset();
     }
     return *output_;
-}
-
-void OpKernelContext::set_output(Tensor tensor){
-    if(output_ || legacy_output_set_){
-        throw std::logic_error("Kernel output has already been requested or submitted.");
-    }
-    frame_.set_value(node_plan_.output, std::move(tensor));
-    legacy_output_set_ = true;
 }
 
 void OpKernelContext::validate_output() const{

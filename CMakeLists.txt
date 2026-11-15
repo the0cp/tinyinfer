@@ -120,12 +120,6 @@ else()
     )
 endif()
 
-add_executable(legacy_mlp_demo examples/legacy_mlp_demo.cpp)
-target_link_libraries(legacy_mlp_demo PRIVATE tinyinfer)
-
-add_executable(ops_demo examples/ops_demo.cpp)
-target_link_libraries(ops_demo PRIVATE tinyinfer)
-
 add_executable(graph_demo examples/graph_demo.cpp)
 target_link_libraries(graph_demo PRIVATE tinyinfer)
 

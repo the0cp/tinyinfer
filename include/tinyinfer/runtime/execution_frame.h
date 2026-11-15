@@ -27,7 +27,6 @@ public:
     const Tensor& value(ValueIndex index) const;
     Tensor& allocate_output(ValueIndex index);
     void validate_output(ValueIndex index) const;
-    void set_value(ValueIndex index, Tensor tensor);
     void release(ValueIndex index);
 
     Tensor fetch(ValueIndex index) const;

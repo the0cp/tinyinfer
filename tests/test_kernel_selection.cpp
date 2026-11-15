@@ -211,7 +211,7 @@ void test_builtin_selection_is_cached_observable_and_correct(){
     const Tensor expected = linear(
         input,
         large->graph().constant("weight"),
-        large->graph().constant("bias")
+        &large->graph().constant("bias")
     );
     const Tensor actual = large->run(input);
     for(size_t index = 0; index < actual.numel(); index++){

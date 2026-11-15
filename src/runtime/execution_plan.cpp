@@ -7,21 +7,6 @@ namespace tinyinfer{
 
 namespace{
 
-std::string shape_to_string(const Shape& shape){
-    std::ostringstream oss;
-    oss << "[";
-
-    for(size_t i = 0; i < shape.size(); i++){
-        if(i > 0){
-            oss << ", ";
-        }
-        oss << shape[i];
-    }
-
-    oss << "]";
-    return oss.str();
-}
-
 std::string role_to_string(ValueRole role){
     switch(role){
         case ValueRole::Input: return "input";
