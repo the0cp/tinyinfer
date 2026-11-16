@@ -1,0 +1,964 @@
+{
+  "schema_version": 1,
+  "environment": {
+    "commit": "5ba07c50e111fe6577f58206606b80820764d193",
+    "cpu": "11th Gen Intel(R) Core(TM) i5-11260H @ 2.60GHz",
+    "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "python": "3.14.5"
+  },
+  "fashion_mnist": {
+    "samples": 10000,
+    "accuracy": 0.8612,
+    "macro_f1": 0.8615446457361582,
+    "runtime_sample_max_abs_error": 2.86102294921875e-06,
+    "runtime_sample_inference_ms": 0.062,
+    "runtime_sample_peak_live_bytes": 512,
+    "per_class": [
+      {
+        "class": "T-shirt/top",
+        "support": 1000,
+        "precision": 0.8521358159912377,
+        "recall": 0.778,
+        "f1": 0.8133821223209617
+      },
+      {
+        "class": "Trouser",
+        "support": 1000,
+        "precision": 0.984646878198567,
+        "recall": 0.962,
+        "f1": 0.9731917046029337
+      },
+      {
+        "class": "Pullover",
+        "support": 1000,
+        "precision": 0.8053763440860215,
+        "recall": 0.749,
+        "f1": 0.7761658031088083
+      },
+      {
+        "class": "Dress",
+        "support": 1000,
+        "precision": 0.8176895306859205,
+        "recall": 0.906,
+        "f1": 0.8595825426944971
+      },
+      {
+        "class": "Coat",
+        "support": 1000,
+        "precision": 0.7771023302938197,
+        "recall": 0.767,
+        "f1": 0.7720181177654757
+      },
+      {
+        "class": "Sandal",
+        "support": 1000,
+        "precision": 0.9771986970684039,
+        "recall": 0.9,
+        "f1": 0.9370119729307653
+      },
+      {
+        "class": "Shirt",
+        "support": 1000,
+        "precision": 0.6455223880597015,
+        "recall": 0.692,
+        "f1": 0.6679536679536678
+      },
+      {
+        "class": "Sneaker",
+        "support": 1000,
+        "precision": 0.866785079928952,
+        "recall": 0.976,
+        "f1": 0.9181561618062088
+      },
+      {
+        "class": "Bag",
+        "support": 1000,
+        "precision": 0.9504459861248761,
+        "recall": 0.959,
+        "f1": 0.9547038327526132
+      },
+      {
+        "class": "Ankle boot",
+        "support": 1000,
+        "precision": 0.9644723092998955,
+        "recall": 0.923,
+        "f1": 0.9432805314256515
+      }
+    ],
+    "confusion": [
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "T-shirt/top",
+        "count": 778
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Trouser",
+        "count": 0
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Pullover",
+        "count": 10
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Dress",
+        "count": 57
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Coat",
+        "count": 3
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Sandal",
+        "count": 1
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Shirt",
+        "count": 139
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Bag",
+        "count": 12
+      },
+      {
+        "true_class": "T-shirt/top",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "T-shirt/top",
+        "count": 3
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Trouser",
+        "count": 962
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Pullover",
+        "count": 1
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Dress",
+        "count": 26
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Coat",
+        "count": 3
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Sandal",
+        "count": 0
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Shirt",
+        "count": 4
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Bag",
+        "count": 1
+      },
+      {
+        "true_class": "Trouser",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "T-shirt/top",
+        "count": 9
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Trouser",
+        "count": 2
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Pullover",
+        "count": 749
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Dress",
+        "count": 16
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Coat",
+        "count": 121
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Sandal",
+        "count": 1
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Shirt",
+        "count": 99
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Bag",
+        "count": 3
+      },
+      {
+        "true_class": "Pullover",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "T-shirt/top",
+        "count": 19
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Trouser",
+        "count": 8
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Pullover",
+        "count": 8
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Dress",
+        "count": 906
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Coat",
+        "count": 23
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Sandal",
+        "count": 0
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Shirt",
+        "count": 29
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Bag",
+        "count": 7
+      },
+      {
+        "true_class": "Dress",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "T-shirt/top",
+        "count": 0
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Trouser",
+        "count": 2
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Pullover",
+        "count": 80
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Dress",
+        "count": 51
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Coat",
+        "count": 767
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Sandal",
+        "count": 0
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Shirt",
+        "count": 95
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Bag",
+        "count": 5
+      },
+      {
+        "true_class": "Coat",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "T-shirt/top",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Trouser",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Pullover",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Dress",
+        "count": 1
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Coat",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Sandal",
+        "count": 900
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Shirt",
+        "count": 0
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Sneaker",
+        "count": 74
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Bag",
+        "count": 4
+      },
+      {
+        "true_class": "Sandal",
+        "predicted_class": "Ankle boot",
+        "count": 21
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "T-shirt/top",
+        "count": 101
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Trouser",
+        "count": 2
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Pullover",
+        "count": 79
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Dress",
+        "count": 42
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Coat",
+        "count": 66
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Sandal",
+        "count": 1
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Shirt",
+        "count": 692
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Sneaker",
+        "count": 0
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Bag",
+        "count": 17
+      },
+      {
+        "true_class": "Shirt",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "T-shirt/top",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Trouser",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Pullover",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Dress",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Coat",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Sandal",
+        "count": 11
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Shirt",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Sneaker",
+        "count": 976
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Bag",
+        "count": 0
+      },
+      {
+        "true_class": "Sneaker",
+        "predicted_class": "Ankle boot",
+        "count": 13
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "T-shirt/top",
+        "count": 3
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Trouser",
+        "count": 1
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Pullover",
+        "count": 3
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Dress",
+        "count": 9
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Coat",
+        "count": 4
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Sandal",
+        "count": 1
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Shirt",
+        "count": 13
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Sneaker",
+        "count": 7
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Bag",
+        "count": 959
+      },
+      {
+        "true_class": "Bag",
+        "predicted_class": "Ankle boot",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "T-shirt/top",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Trouser",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Pullover",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Dress",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Coat",
+        "count": 0
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Sandal",
+        "count": 6
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Shirt",
+        "count": 1
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Sneaker",
+        "count": 69
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Bag",
+        "count": 1
+      },
+      {
+        "true_class": "Ankle boot",
+        "predicted_class": "Ankle boot",
+        "count": 923
+      }
+    ]
+  },
+  "qwen": {
+    "correctness": [
+      {
+        "step": 0,
+        "max_abs_error": 0.000292301,
+        "mean_abs_error": 5.1278e-05
+      },
+      {
+        "step": 1,
+        "max_abs_error": 0.000186205,
+        "mean_abs_error": 3.00687e-05
+      },
+      {
+        "step": 2,
+        "max_abs_error": 0.000181437,
+        "mean_abs_error": 2.56228e-05
+      }
+    ],
+    "performance": [
+      {
+        "run": 1,
+        "prompt_tokens": 28,
+        "generated_tokens": 8,
+        "prefill_ms": 1241.179,
+        "decode_ms": 1501.903,
+        "decode_ms_per_token": 214.55757142857144,
+        "decode_tokens_per_second": 4.661,
+        "generated_tokens_per_second": 2.916,
+        "text": "A cache is a temporary storage device that"
+      },
+      {
+        "run": 2,
+        "prompt_tokens": 28,
+        "generated_tokens": 8,
+        "prefill_ms": 972.781,
+        "decode_ms": 1281.65,
+        "decode_ms_per_token": 183.09285714285716,
+        "decode_tokens_per_second": 5.462,
+        "generated_tokens_per_second": 3.549,
+        "text": "A cache is a temporary storage device that"
+      },
+      {
+        "run": 3,
+        "prompt_tokens": 28,
+        "generated_tokens": 8,
+        "prefill_ms": 1042.27,
+        "decode_ms": 1231.433,
+        "decode_ms_per_token": 175.919,
+        "decode_tokens_per_second": 5.684,
+        "generated_tokens_per_second": 3.518,
+        "text": "A cache is a temporary storage device that"
+      },
+      {
+        "run": 4,
+        "prompt_tokens": 28,
+        "generated_tokens": 8,
+        "prefill_ms": 1094.18,
+        "decode_ms": 1306.92,
+        "decode_ms_per_token": 186.70285714285714,
+        "decode_tokens_per_second": 5.356,
+        "generated_tokens_per_second": 3.332,
+        "text": "A cache is a temporary storage device that"
+      },
+      {
+        "run": 5,
+        "prompt_tokens": 28,
+        "generated_tokens": 8,
+        "prefill_ms": 1302.047,
+        "decode_ms": 1388.948,
+        "decode_ms_per_token": 198.42114285714288,
+        "decode_tokens_per_second": 5.04,
+        "generated_tokens_per_second": 2.973,
+        "text": "A cache is a temporary storage device that"
+      }
+    ]
+  },
+  "benchmarks": {
+    "kv_cache": [
+      {
+        "tokens": "32",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "8",
+        "group_size": "1",
+        "full_recompute_us": "3472.8",
+        "kv_cached_us": "324.0",
+        "speedup": "10.7",
+        "cache_bytes": "32768",
+        "cache_saving_vs_mha": "0.000",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "32",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "2",
+        "group_size": "4",
+        "full_recompute_us": "3428.6",
+        "kv_cached_us": "363.7",
+        "speedup": "9.4",
+        "cache_bytes": "8192",
+        "cache_saving_vs_mha": "0.750",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "32",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "1",
+        "group_size": "8",
+        "full_recompute_us": "4226.6",
+        "kv_cached_us": "497.9",
+        "speedup": "8.5",
+        "cache_bytes": "4096",
+        "cache_saving_vs_mha": "0.875",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "64",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "8",
+        "group_size": "1",
+        "full_recompute_us": "28392.5",
+        "kv_cached_us": "1634.3",
+        "speedup": "17.4",
+        "cache_bytes": "65536",
+        "cache_saving_vs_mha": "0.000",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "64",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "2",
+        "group_size": "4",
+        "full_recompute_us": "28139.4",
+        "kv_cached_us": "1464.2",
+        "speedup": "19.2",
+        "cache_bytes": "16384",
+        "cache_saving_vs_mha": "0.750",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "64",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "1",
+        "group_size": "8",
+        "full_recompute_us": "29805.5",
+        "kv_cached_us": "1363.2",
+        "speedup": "21.9",
+        "cache_bytes": "8192",
+        "cache_saving_vs_mha": "0.875",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "96",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "8",
+        "group_size": "1",
+        "full_recompute_us": "103811.9",
+        "kv_cached_us": "3437.8",
+        "speedup": "30.2",
+        "cache_bytes": "98304",
+        "cache_saving_vs_mha": "0.000",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "96",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "2",
+        "group_size": "4",
+        "full_recompute_us": "113431.7",
+        "kv_cached_us": "3880.4",
+        "speedup": "29.2",
+        "cache_bytes": "24576",
+        "cache_saving_vs_mha": "0.750",
+        "checksum_delta": "0.000"
+      },
+      {
+        "tokens": "96",
+        "prompt_tokens": "8",
+        "query_heads": "8",
+        "kv_heads": "1",
+        "group_size": "8",
+        "full_recompute_us": "98319.8",
+        "kv_cached_us": "3020.3",
+        "speedup": "32.6",
+        "cache_bytes": "12288",
+        "cache_saving_vs_mha": "0.875",
+        "checksum_delta": "0.000"
+      }
+    ],
+    "paged_kv_cache": [
+      {
+        "block_tokens": "1",
+        "requests": "5",
+        "logical_bytes": "36864",
+        "paged_mapped_bytes": "36864",
+        "contiguous_bytes": "163840",
+        "paged_utilization": "1.000",
+        "saving_vs_contiguous": "0.775"
+      },
+      {
+        "block_tokens": "4",
+        "requests": "5",
+        "logical_bytes": "36864",
+        "paged_mapped_bytes": "38912",
+        "contiguous_bytes": "163840",
+        "paged_utilization": "0.947",
+        "saving_vs_contiguous": "0.762"
+      },
+      {
+        "block_tokens": "8",
+        "requests": "5",
+        "logical_bytes": "36864",
+        "paged_mapped_bytes": "45056",
+        "contiguous_bytes": "163840",
+        "paged_utilization": "0.818",
+        "saving_vs_contiguous": "0.725"
+      },
+      {
+        "block_tokens": "16",
+        "requests": "5",
+        "logical_bytes": "36864",
+        "paged_mapped_bytes": "57344",
+        "contiguous_bytes": "163840",
+        "paged_utilization": "0.643",
+        "saving_vs_contiguous": "0.650"
+      }
+    ],
+    "prefix_sharing": [
+      {
+        "requests": "4",
+        "prefix_tokens": "16",
+        "suffix_tokens": "4",
+        "independent_blocks": "20",
+        "physical_blocks_with_sharing": "8",
+        "saving_vs_independent": "0.600"
+      }
+    ],
+    "linear": [
+      {
+        "case": "prefill_32x896_to_4864",
+        "serial_ms": 49.879,
+        "threaded_ms": 13.869,
+        "speedup": 3.596,
+        "selected": "threaded"
+      },
+      {
+        "case": "decode_1x896_to_128",
+        "serial_ms": 0.028,
+        "threaded_ms": 0.35,
+        "speedup": 0.079,
+        "selected": "serial"
+      },
+      {
+        "case": "decode_1x896_to_896",
+        "serial_ms": 0.437,
+        "threaded_ms": 0.47,
+        "speedup": 0.929,
+        "selected": "serial"
+      },
+      {
+        "case": "decode_1x896_to_4864",
+        "serial_ms": 2.577,
+        "threaded_ms": 1.362,
+        "speedup": 1.892,
+        "selected": "threaded"
+      }
+    ],
+    "memory_plan": {
+      "build": "release",
+      "nodes": "12",
+      "tensor_elements": "4096",
+      "measurement": "batches:21",
+      "unplanned_managed_buffers": "12",
+      "unplanned_allocated_bytes": "196608",
+      "unplanned_logical_peak_bytes": "32768",
+      "planned_managed_buffers": "3",
+      "planned_arena_bytes": "49152",
+      "planned_value_reuses": "9",
+      "unplanned_batch_mean_median_us": "14.167",
+      "unplanned_batch_mean_p95_us": "16.403",
+      "planned_batch_mean_median_us": "9.634",
+      "planned_batch_mean_p95_us": "13.142"
+    },
+    "memory_plan_runs": [
+      {
+        "build": "release",
+        "nodes": "12",
+        "tensor_elements": "4096",
+        "measurement": "batches:21",
+        "unplanned_managed_buffers": "12",
+        "unplanned_allocated_bytes": "196608",
+        "unplanned_logical_peak_bytes": "32768",
+        "planned_managed_buffers": "3",
+        "planned_arena_bytes": "49152",
+        "planned_value_reuses": "9",
+        "unplanned_batch_mean_median_us": "15.276",
+        "unplanned_batch_mean_p95_us": "18.120",
+        "planned_batch_mean_median_us": "11.617",
+        "planned_batch_mean_p95_us": "14.938"
+      },
+      {
+        "build": "release",
+        "nodes": "12",
+        "tensor_elements": "4096",
+        "measurement": "batches:21",
+        "unplanned_managed_buffers": "12",
+        "unplanned_allocated_bytes": "196608",
+        "unplanned_logical_peak_bytes": "32768",
+        "planned_managed_buffers": "3",
+        "planned_arena_bytes": "49152",
+        "planned_value_reuses": "9",
+        "unplanned_batch_mean_median_us": "15.918",
+        "unplanned_batch_mean_p95_us": "21.474",
+        "planned_batch_mean_median_us": "9.387",
+        "planned_batch_mean_p95_us": "12.195"
+      },
+      {
+        "build": "release",
+        "nodes": "12",
+        "tensor_elements": "4096",
+        "measurement": "batches:21",
+        "unplanned_managed_buffers": "12",
+        "unplanned_allocated_bytes": "196608",
+        "unplanned_logical_peak_bytes": "32768",
+        "planned_managed_buffers": "3",
+        "planned_arena_bytes": "49152",
+        "planned_value_reuses": "9",
+        "unplanned_batch_mean_median_us": "13.913",
+        "unplanned_batch_mean_p95_us": "15.723",
+        "planned_batch_mean_median_us": "12.287",
+        "planned_batch_mean_p95_us": "15.598"
+      },
+      {
+        "build": "release",
+        "nodes": "12",
+        "tensor_elements": "4096",
+        "measurement": "batches:21",
+        "unplanned_managed_buffers": "12",
+        "unplanned_allocated_bytes": "196608",
+        "unplanned_logical_peak_bytes": "32768",
+        "planned_managed_buffers": "3",
+        "planned_arena_bytes": "49152",
+        "planned_value_reuses": "9",
+        "unplanned_batch_mean_median_us": "14.167",
+        "unplanned_batch_mean_p95_us": "16.403",
+        "planned_batch_mean_median_us": "9.634",
+        "planned_batch_mean_p95_us": "13.142"
+      },
+      {
+        "build": "release",
+        "nodes": "12",
+        "tensor_elements": "4096",
+        "measurement": "batches:21",
+        "unplanned_managed_buffers": "12",
+        "unplanned_allocated_bytes": "196608",
+        "unplanned_logical_peak_bytes": "32768",
+        "planned_managed_buffers": "3",
+        "planned_arena_bytes": "49152",
+        "planned_value_reuses": "9",
+        "unplanned_batch_mean_median_us": "12.592",
+        "unplanned_batch_mean_p95_us": "15.475",
+        "planned_batch_mean_median_us": "8.058",
+        "planned_batch_mean_p95_us": "10.310"
+      }
+    ]
+  }
+}

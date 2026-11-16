@@ -1,0 +1,6 @@
+build,nodes,tensor_elements,measurement,unplanned_managed_buffers,unplanned_allocated_bytes,unplanned_logical_peak_bytes,planned_managed_buffers,planned_arena_bytes,planned_value_reuses,unplanned_batch_mean_median_us,unplanned_batch_mean_p95_us,planned_batch_mean_median_us,planned_batch_mean_p95_us
+release,12,4096,batches:21,12,196608,32768,3,49152,9,15.276,18.120,11.617,14.938
+release,12,4096,batches:21,12,196608,32768,3,49152,9,15.918,21.474,9.387,12.195
+release,12,4096,batches:21,12,196608,32768,3,49152,9,13.913,15.723,12.287,15.598
+release,12,4096,batches:21,12,196608,32768,3,49152,9,14.167,16.403,9.634,13.142
+release,12,4096,batches:21,12,196608,32768,3,49152,9,12.592,15.475,8.058,10.310

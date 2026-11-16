@@ -1,0 +1,5 @@
+block_tokens,requests,logical_bytes,paged_mapped_bytes,contiguous_bytes,paged_utilization,saving_vs_contiguous
+1,5,36864,36864,163840,1.000,0.775
+4,5,36864,38912,163840,0.947,0.762
+8,5,36864,45056,163840,0.818,0.725
+16,5,36864,57344,163840,0.643,0.650

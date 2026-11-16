@@ -130,3 +130,20 @@ done
 
 Measurement definitions and recorded results are in
 [benchmark/RESULT.md](benchmark/RESULT.md).
+
+## Model evaluation
+
+The evaluation runner checks model quality, numerical agreement and runtime performance. It evaluates the exported Fashion-MNIST model on all 10,000 test images, verifies Qwen logits and greedy tokens against the reference fixture, repeats CLI generation while recording Prefill/Decode metrics, and runs the focused cache, Linear and memory-plan benchmarks. 
+
+```bash
+python -m pip install -r tools/evaluation-requirements.txt
+python tools/evaluate.py
+```
+
+[benchmark/evaluation](benchmark/evaluation/README.md).
+
+![Fashion-MNIST confusion matrix](benchmark/evaluation/figures/fashion_confusion_matrix.svg)
+
+![Qwen reference logit error](benchmark/evaluation/figures/qwen_logit_error.svg)
+
+![KV cache speedup](benchmark/evaluation/figures/kv_cache_speedup.svg)
