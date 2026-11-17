@@ -48,6 +48,9 @@ SHORT_NAMES = (
     "Boot",
 )
 COLORS = ("#2563EB", "#F59E0B", "#10B981", "#8B5CF6")
+REFERENCE_SYSTEM_PROMPT = "You are a concise inference systems tutor."
+REFERENCE_USER_PROMPT = "Explain KV cache in one short sentence."
+CLI_SYSTEM_PROMPT = "You are a helpful assistant."
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,7 +85,14 @@ def parse_args() -> argparse.Namespace:
         help="copy rendered PNG and SVG files to this directory",
     )
     parser.add_argument("--qwen-runs", type=int, default=5)
-    parser.add_argument("--generated-tokens", type=int, default=8)
+    parser.add_argument(
+        "--max-new-tokens",
+        "--generated-tokens",
+        dest="max_new_tokens",
+        type=int,
+        default=64,
+        help="generation safety limit; generation may stop earlier at EOS",
+    )
     return parser.parse_args()
 
 
@@ -119,7 +129,11 @@ def cpu_name() -> str:
 
 def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=list(rows[0]),
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -258,7 +272,7 @@ def eval_qwen(
     checker: Path,
     tinyinfer: Path,
     runs: int,
-    generated_tokens: int,
+    max_new_tokens: int,
 ) -> dict[str, object]:
     check = run(
         checker,
@@ -266,17 +280,46 @@ def eval_qwen(
         model_dir / "tokenizer.json",
         model_dir / "model_case.bin",
     )
+    metrics_text = check.split("layer_metrics_begin\n", maxsplit=1)[1].split(
+        "layer_metrics_end\n",
+        maxsplit=1,
+    )[0]
+    layer_metrics = [
+        {
+            "phase": row["phase"],
+            "stage": row["stage"],
+            "max_abs_error": float(row["max_abs_error"]),
+            "mean_abs_error": float(row["mean_abs_error"]),
+            "cosine_similarity": float(row["cosine_similarity"]),
+        }
+        for row in csv_output(metrics_text)
+    ]
     correctness = [
         {
-            "step": int(match.group(1)),
-            "max_abs_error": float(match.group(2)),
-            "mean_abs_error": float(match.group(3)),
+            "step": 0 if row["phase"] == "prefill" else int(row["phase"][7:]),
+            "phase": row["phase"],
+            "max_abs_error": row["max_abs_error"],
+            "mean_abs_error": row["mean_abs_error"],
+            "cosine_similarity": row["cosine_similarity"],
         }
-        for match in re.finditer(
-            r"step (\d+): max_abs_error=([^,]+), mean_abs_error=([^\n]+)",
-            check,
-        )
+        for row in layer_metrics
+        if row["stage"] == "Logits"
     ]
+
+    fixture = json.loads((model_dir / "fixtures.json").read_text(encoding="utf-8"))
+    chat = next(case for case in fixture["token_cases"] if case["name"] == "chat")
+    reference = {
+        "system_prompt": REFERENCE_SYSTEM_PROMPT,
+        "user_prompt": REFERENCE_USER_PROMPT,
+        "rendered_prompt": chat["text"],
+        "prompt_tokens": len(chat["token_ids"]),
+        "generated_tokens": len(fixture["generation"]["token_ids"]),
+        "decode_steps": max(0, len(fixture["generation"]["token_ids"]) - 1),
+        "max_new_tokens": fixture["generation"]["max_new_tokens"],
+        "stop_reason": fixture["generation"]["stop_reason"],
+        "generated_text": fixture["generation"]["decoded"].removesuffix("<|im_end|>"),
+        "layers": fixture["model_case"]["layers"],
+    }
 
     performance: list[dict[str, object]] = []
     for index in range(runs):
@@ -284,8 +327,8 @@ def eval_qwen(
             tinyinfer,
             "generate",
             model_dir,
-            "Explain KV cache in one short sentence.",
-            generated_tokens,
+            REFERENCE_USER_PROMPT,
+            max_new_tokens,
         )
         result = values(output)
         decoded = output.split("\n\n", maxsplit=1)[0].strip()
@@ -310,7 +353,17 @@ def eval_qwen(
             }
         )
 
-    return {"correctness": correctness, "performance": performance}
+    return {
+        "reference": reference,
+        "layer_metrics": layer_metrics,
+        "correctness": correctness,
+        "performance_prompt": {
+            "system_prompt": CLI_SYSTEM_PROMPT,
+            "user_prompt": REFERENCE_USER_PROMPT,
+            "max_new_tokens": max_new_tokens,
+        },
+        "performance": performance,
+    }
 
 
 def eval_benchmarks(build_dir: Path) -> dict[str, object]:
@@ -476,12 +529,70 @@ def plot_qwen(
         color=COLORS[1],
     )
     axis.set_yscale("log")
-    axis.set_xticks(steps)
-    axis.set_xlabel("Generation step")
+    tick_stride = max(1, len(steps) // 8)
+    ticks = steps[::tick_stride]
+    if ticks[-1] != steps[-1]:
+        ticks.append(steps[-1])
+    axis.set_xticks(
+        ticks,
+        ["Prefill" if step == 0 else f"D{step}" for step in ticks],
+    )
+    axis.set_xlabel("Generation phase")
     axis.set_ylabel("Absolute logit error (log scale)")
-    axis.set_title("Qwen2.5-0.5B logits match the reference")
+    axis.set_title("Final-logit error across Prefill and cached Decode")
     axis.legend()
     save(figure, "qwen_logit_error", figure_dir, copy_dirs)
+
+    phases = ["prefill"] + [f"decode_{step}" for step in steps[1:]]
+    stages = ["Embedding"] + [
+        f"Layer {layer}" for layer in range(result["reference"]["layers"])
+    ] + ["Final RMSNorm"]
+    rows = {
+        (row["stage"], row["phase"]): row
+        for row in result["layer_metrics"]
+        if row["stage"] != "Logits"
+    }
+    for field, title, name, color_label in (
+        (
+            "max_abs_error",
+            "Maximum absolute error by Qwen layer and generation phase",
+            "qwen_layer_max_error",
+            "Maximum absolute error (×10⁻⁶)",
+        ),
+        (
+            "mean_abs_error",
+            "Mean absolute error by Qwen layer and generation phase",
+            "qwen_layer_mean_error",
+            "Mean absolute error (×10⁻⁶)",
+        ),
+    ):
+        matrix = np.array(
+            [
+                [rows[(stage, phase)][field] * 1_000_000.0 for phase in phases]
+                for stage in stages
+            ]
+        )
+        width = min(18.0, max(10.0, 5.0 + 0.32 * len(phases)))
+        figure, axis = plt.subplots(figsize=(width, 9.0))
+        image = axis.imshow(matrix, aspect="auto", cmap="magma", vmin=0.0)
+        axis.grid(False)
+        x_stride = max(1, len(phases) // 12)
+        x_positions = list(range(0, len(phases), x_stride))
+        if x_positions[-1] != len(phases) - 1:
+            x_positions.append(len(phases) - 1)
+        axis.set_xticks(
+            x_positions,
+            ["Prefill" if index == 0 else f"D{index}" for index in x_positions],
+            rotation=45,
+            ha="right",
+        )
+        axis.set_yticks(range(len(stages)), stages)
+        axis.set_xlabel("Generation phase")
+        axis.set_ylabel("Compared output")
+        axis.set_title(title)
+        colorbar = figure.colorbar(image, ax=axis, shrink=0.88)
+        colorbar.set_label(color_label)
+        save(figure, name, figure_dir, copy_dirs)
 
     performance = result["performance"]
     prefill = [row["prefill_ms"] for row in performance]
@@ -612,6 +723,8 @@ def write_report(path: Path, result: dict[str, object]) -> None:
     fashion = result["fashion_mnist"]
     qwen = result["qwen"]
     qwen_perf = qwen["performance"]
+    reference = qwen["reference"]
+    performance_prompt = qwen["performance_prompt"]
     max_error = max(row["max_abs_error"] for row in qwen["correctness"])
     throughput = median([row["decode_tokens_per_second"] for row in qwen_perf])
     memory = result["benchmarks"]["memory_plan"]
@@ -631,6 +744,10 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 f"{fashion['runtime_sample_max_abs_error']:.3g} on the exported sample.",
                 f"- Qwen reference check: all greedy tokens match; maximum observed logit "
                 f"error {max_error:.3g}.",
+                f"- Qwen reference generation: {reference['prompt_tokens']} prompt tokens, "
+                f"{reference['generated_tokens']} generated token ids including EOS, "
+                f"{reference['decode_steps']} cached Decode steps, stop={reference['stop_reason']}.",
+                f"- Qwen reference output: `{reference['generated_text']}`",
                 f"- Qwen generation: median decode throughput {throughput:.2f} tokens/s "
                 f"across {len(qwen_perf)} runs.",
                 f"- Memory plan: median batch-mean latency "
@@ -639,6 +756,15 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 "",
                 "## Method",
                 "",
+                f"- Correctness prompt: system=`{reference['system_prompt']}`; "
+                f"user=`{reference['user_prompt']}`.",
+                f"- Correctness generation stops at EOS; {reference['max_new_tokens']} is only "
+                "the safety limit.",
+                f"- Correctness compares Embedding, all {reference['layers']} decoder layers, "
+                "Final RMSNorm and final logits for Prefill and every cached Decode step.",
+                f"- Performance prompt: system=`{performance_prompt['system_prompt']}`; "
+                f"user=`{performance_prompt['user_prompt']}`; safety limit="
+                f"{performance_prompt['max_new_tokens']} new tokens.",
                 "- Fashion-MNIST quality is computed from the exported FP32 weights over the "
                 "official 10,000-image test split. One exported sample is also checked through "
                 "the C++ runtime.",
@@ -654,6 +780,8 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 "- `figures/fashion_confusion_matrix.{png,svg}`",
                 "- `figures/fashion_class_f1.{png,svg}`",
                 "- `figures/qwen_logit_error.{png,svg}`",
+                "- `figures/qwen_layer_max_error.{png,svg}`",
+                "- `figures/qwen_layer_mean_error.{png,svg}`",
                 "- `figures/qwen_generation_latency.{png,svg}`",
                 "- `figures/kv_cache_speedup.{png,svg}`",
                 "- `figures/paged_kv_memory.{png,svg}`",
@@ -669,8 +797,8 @@ def write_report(path: Path, result: dict[str, object]) -> None:
 
 def main() -> None:
     args = parse_args()
-    if args.qwen_runs <= 0 or args.generated_tokens <= 1:
-        raise ValueError("qwen-runs must be positive and generated-tokens must exceed one")
+    if args.qwen_runs <= 0 or args.max_new_tokens <= 1:
+        raise ValueError("qwen-runs must be positive and max-new-tokens must exceed one")
 
     output_dir = args.output_dir.resolve()
     figure_dir = output_dir / "figures"
@@ -689,11 +817,11 @@ def main() -> None:
         build_dir / "check_qwen_model",
         build_dir / "tinyinfer",
         args.qwen_runs,
-        args.generated_tokens,
+        args.max_new_tokens,
     )
     benchmarks = eval_benchmarks(build_dir)
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "environment": {
             "commit": run("git", "-C", ROOT, "rev-parse", "HEAD").strip(),
             "cpu": cpu_name(),
@@ -713,6 +841,7 @@ def main() -> None:
     write_csv(output_dir / "fashion_per_class.csv", fashion["per_class"])
     write_csv(output_dir / "fashion_confusion.csv", fashion["confusion"])
     write_csv(output_dir / "qwen_correctness.csv", qwen["correctness"])
+    write_csv(output_dir / "qwen_layer_errors.csv", qwen["layer_metrics"])
     write_csv(output_dir / "qwen_generation.csv", qwen["performance"])
     write_csv(output_dir / "kv_cache.csv", benchmarks["kv_cache"])
     write_csv(output_dir / "paged_kv_cache.csv", benchmarks["paged_kv_cache"])

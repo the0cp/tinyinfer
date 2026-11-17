@@ -52,7 +52,7 @@ EXPECTED_CONFIG = {
 
 CHAT_MESSAGES = [
     {"role": "system", "content": "You are a concise inference systems tutor."},
-    {"role": "user", "content": "用一句话解释 KV cache。"},
+    {"role": "user", "content": "Explain KV cache in one short sentence."},
 ]
 
 
@@ -73,10 +73,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-new-tokens",
         type=int,
-        default=3,
-        choices=range(1, 9),
-        metavar="1..8",
-        help="Fixed number of greedy reference decode steps (default: 3).",
+        default=64,
+        choices=range(1, 129),
+        metavar="1..128",
+        help="Greedy generation safety limit; generation stops at EOS (default: 64).",
     )
     return parser.parse_args()
 
@@ -241,7 +241,7 @@ def export_model_arrays(
     model_dir: Path,
     input_ids: torch.Tensor,
     max_new_tokens: int,
-) -> tuple[dict[str, np.ndarray], list[int]]:
+) -> tuple[dict[str, np.ndarray], list[int], str]:
     torch.set_num_threads(1)
     torch.manual_seed(0)
     model = AutoModelForCausalLM.from_pretrained(
@@ -254,75 +254,143 @@ def export_model_arrays(
 
     arrays: dict[str, np.ndarray] = {}
     add_array(arrays, "input_ids", input_ids.numpy())
+    captured_layers: list[np.ndarray] = []
 
-    with torch.inference_mode():
-        hidden = model.model.embed_tokens(input_ids)
-        layer = model.model.layers[0]
-        normalized = layer.input_layernorm(hidden)
-        attention = layer.self_attn
+    def capture_layer(_module: Any, _inputs: Any, output: Any) -> None:
+        hidden_state = output[0] if isinstance(output, tuple) else output
+        captured_layers.append(as_array(hidden_state[0]))
 
-        batch, tokens, _ = normalized.shape
-        queries = attention.q_proj(normalized).view(
-            batch, tokens, attention.num_heads, attention.head_dim
-        ).transpose(1, 2)
-        keys = attention.k_proj(normalized).view(
-            batch, tokens, attention.num_key_value_heads, attention.head_dim
-        ).transpose(1, 2)
-        values = attention.v_proj(normalized).view(
-            batch, tokens, attention.num_key_value_heads, attention.head_dim
-        ).transpose(1, 2)
-        positions = torch.arange(tokens, dtype=torch.long).unsqueeze(0)
-        cos, sin = attention.rotary_emb(values, seq_len=tokens)
-        rotated_queries, rotated_keys = apply_rotary_pos_emb(
-            queries, keys, cos, sin, positions
-        )
+    hooks = [
+        layer.register_forward_hook(capture_layer)
+        for layer in model.model.layers
+    ]
 
-        outputs = model(
-            input_ids=input_ids,
-            past_key_values=DynamicCache(),
-            use_cache=True,
-            output_hidden_states=True,
-            return_dict=True,
-        )
+    try:
+        with torch.inference_mode():
+            hidden = model.model.embed_tokens(input_ids)
+            layer = model.model.layers[0]
+            normalized = layer.input_layernorm(hidden)
+            attention = layer.self_attn
 
-        add_array(arrays, "embedding", as_array(hidden[0]))
-        add_array(arrays, "layer0_input_norm", as_array(normalized[0]))
-        add_array(arrays, "layer0_query", as_array(queries.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_key", as_array(keys.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_value", as_array(values.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_query_rope", as_array(rotated_queries.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_key_rope", as_array(rotated_keys.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_output", as_array(outputs.hidden_states[1][0]))
-        add_array(arrays, "final_hidden", as_array(outputs.hidden_states[-1][0]))
+            batch, tokens, _ = normalized.shape
+            queries = attention.q_proj(normalized).view(
+                batch, tokens, attention.num_heads, attention.head_dim
+            ).transpose(1, 2)
+            keys = attention.k_proj(normalized).view(
+                batch, tokens, attention.num_key_value_heads, attention.head_dim
+            ).transpose(1, 2)
+            values = attention.v_proj(normalized).view(
+                batch, tokens, attention.num_key_value_heads, attention.head_dim
+            ).transpose(1, 2)
+            positions = torch.arange(tokens, dtype=torch.long).unsqueeze(0)
+            cos, sin = attention.rotary_emb(values, seq_len=tokens)
+            rotated_queries, rotated_keys = apply_rotary_pos_emb(
+                queries, keys, cos, sin, positions
+            )
 
-        cache_key, cache_value = outputs.past_key_values[0]
-        torch.testing.assert_close(cache_key, rotated_keys, rtol=0, atol=0)
-        torch.testing.assert_close(cache_value, values, rtol=0, atol=0)
-        add_array(arrays, "layer0_cache_key", as_array(cache_key.transpose(1, 2)[0]))
-        add_array(arrays, "layer0_cache_value", as_array(cache_value.transpose(1, 2)[0]))
-
-        logits = outputs.logits[:, -1, :]
-        add_array(arrays, "prefill_last_logits", as_array(logits[0]))
-        past = outputs.past_key_values
-        generated: list[int] = []
-
-        for step in range(max_new_tokens):
-            token = torch.argmax(logits, dim=-1)
-            generated.append(int(token.item()))
-            if step + 1 == max_new_tokens:
-                break
+            captured_layers.clear()
             outputs = model(
-                input_ids=token[:, None],
-                past_key_values=past,
+                input_ids=input_ids,
+                past_key_values=DynamicCache(),
                 use_cache=True,
+                output_hidden_states=True,
                 return_dict=True,
             )
-            past = outputs.past_key_values
+            if len(captured_layers) != len(model.model.layers):
+                raise RuntimeError("failed to capture every prefill layer output")
+
+            add_array(arrays, "embedding", as_array(hidden[0]))
+            add_array(arrays, "layer0_input_norm", as_array(normalized[0]))
+            add_array(arrays, "layer0_query", as_array(queries.transpose(1, 2)[0]))
+            add_array(arrays, "layer0_key", as_array(keys.transpose(1, 2)[0]))
+            add_array(arrays, "layer0_value", as_array(values.transpose(1, 2)[0]))
+            add_array(
+                arrays,
+                "layer0_query_rope",
+                as_array(rotated_queries.transpose(1, 2)[0]),
+            )
+            add_array(
+                arrays,
+                "layer0_key_rope",
+                as_array(rotated_keys.transpose(1, 2)[0]),
+            )
+            for index, layer_output in enumerate(captured_layers):
+                add_array(arrays, f"prefill_layer_{index}_output", layer_output)
+            add_array(arrays, "layer0_output", captured_layers[0])
+            add_array(arrays, "final_hidden", as_array(outputs.hidden_states[-1][0]))
+
+            cache_key, cache_value = outputs.past_key_values[0]
+            torch.testing.assert_close(cache_key, rotated_keys, rtol=0, atol=0)
+            torch.testing.assert_close(cache_value, values, rtol=0, atol=0)
+            add_array(
+                arrays,
+                "layer0_cache_key",
+                as_array(cache_key.transpose(1, 2)[0]),
+            )
+            add_array(
+                arrays,
+                "layer0_cache_value",
+                as_array(cache_value.transpose(1, 2)[0]),
+            )
+
             logits = outputs.logits[:, -1, :]
-            add_array(arrays, f"decode_{step + 1}_logits", as_array(logits[0]))
+            add_array(arrays, "prefill_last_logits", as_array(logits[0]))
+            past = outputs.past_key_values
+            generated: list[int] = []
+            stop_reason = "max_new_tokens"
+
+            for step in range(max_new_tokens):
+                token = torch.argmax(logits, dim=-1)
+                generated.append(int(token.item()))
+                if int(token.item()) == model.config.eos_token_id:
+                    stop_reason = "eos"
+                    break
+                if step + 1 == max_new_tokens:
+                    break
+
+                decode_input = token[:, None]
+                decode_embedding = model.model.embed_tokens(decode_input)
+                captured_layers.clear()
+                outputs = model(
+                    input_ids=decode_input,
+                    past_key_values=past,
+                    use_cache=True,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+                if len(captured_layers) != len(model.model.layers):
+                    raise RuntimeError(
+                        f"failed to capture every layer output at decode step {step + 1}"
+                    )
+                add_array(
+                    arrays,
+                    f"decode_{step + 1}_embedding",
+                    as_array(decode_embedding[0]),
+                )
+                for index, layer_output in enumerate(captured_layers):
+                    add_array(
+                        arrays,
+                        f"decode_{step + 1}_layer_{index}_output",
+                        layer_output,
+                    )
+                add_array(
+                    arrays,
+                    f"decode_{step + 1}_final_hidden",
+                    as_array(outputs.hidden_states[-1][0]),
+                )
+                past = outputs.past_key_values
+                logits = outputs.logits[:, -1, :]
+                add_array(
+                    arrays,
+                    f"decode_{step + 1}_logits",
+                    as_array(logits[0]),
+                )
+    finally:
+        for hook in hooks:
+            hook.remove()
 
     del model
-    return arrays, generated
+    return arrays, generated, stop_reason
 
 
 def write_fixtures(
@@ -333,6 +401,8 @@ def write_fixtures(
     arrays: dict[str, np.ndarray],
     generated: list[int],
     generated_text: str,
+    max_new_tokens: int,
+    stop_reason: str,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     binary_path = output_dir / "fixtures.bin"
@@ -373,22 +443,52 @@ def write_fixtures(
     vocab_size = int(config["vocab_size"])
     if not generated or any(array.shape != (vocab_size,) for array in logits):
         raise ValueError("model case logits do not match generation metadata")
+    layer_count = int(config["num_hidden_layers"])
+    hidden_size = int(config["hidden_size"])
+    prefill_layers = np.stack(
+        [arrays[f"prefill_layer_{layer}_output"] for layer in range(layer_count)]
+    ).astype("<f4", copy=False)
+    decode_steps = len(generated) - 1
+    decode_embeddings = np.stack(
+        [arrays[f"decode_{step}_embedding"] for step in range(1, len(generated))]
+    ) if decode_steps else np.empty((0, hidden_size), dtype="<f4")
+    decode_layers = np.stack(
+        [
+            np.stack(
+                [
+                    arrays[f"decode_{step}_layer_{layer}_output"]
+                    for layer in range(layer_count)
+                ]
+            )
+            for step in range(1, len(generated))
+        ]
+    ) if decode_steps else np.empty((0, layer_count, hidden_size), dtype="<f4")
+    decode_final = np.stack(
+        [arrays[f"decode_{step}_final_hidden"] for step in range(1, len(generated))]
+    ) if decode_steps else np.empty((0, hidden_size), dtype="<f4")
     model_case_path = output_dir / "model_case.bin"
     with model_case_path.open("wb") as stream:
         stream.write(
             struct.pack(
-                "<8sIIII",
-                b"TIQMC001",
-                1,
+                "<8sIIIIII",
+                b"TIQMC002",
+                2,
                 input_ids.size,
                 vocab_size,
+                layer_count,
+                hidden_size,
                 len(generated),
             )
         )
         stream.write(input_ids.tobytes(order="C"))
         stream.write(np.asarray(generated, dtype="<i8").tobytes(order="C"))
-        for array in logits:
-            stream.write(array.tobytes(order="C"))
+        stream.write(arrays["embedding"].astype("<f4", copy=False).tobytes(order="C"))
+        stream.write(prefill_layers.tobytes(order="C"))
+        stream.write(arrays["final_hidden"].astype("<f4", copy=False).tobytes(order="C"))
+        stream.write(decode_embeddings.astype("<f4", copy=False).tobytes(order="C"))
+        stream.write(decode_layers.astype("<f4", copy=False).tobytes(order="C"))
+        stream.write(decode_final.astype("<f4", copy=False).tobytes(order="C"))
+        stream.write(np.stack(logits).tobytes(order="C"))
 
     manifest = {
         "format": "tinyinfer_qwen_fixture",
@@ -414,6 +514,8 @@ def write_fixtures(
         "token_cases": token_cases,
         "generation": {
             "strategy": "greedy_argmax",
+            "max_new_tokens": max_new_tokens,
+            "stop_reason": stop_reason,
             "token_ids": generated,
             "decoded": generated_text,
         },
@@ -432,7 +534,10 @@ def write_fixtures(
             "file": model_case_path.name,
             "prompt_tokens": int(input_ids.size),
             "vocab_size": vocab_size,
+            "layers": layer_count,
+            "hidden_size": hidden_size,
             "steps": len(generated),
+            "decode_steps": decode_steps,
             "sha256": sha256_file(model_case_path),
         },
         "arrays": entries,
@@ -453,7 +558,11 @@ def main() -> None:
     config, source_hashes = validate_source(model_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True, use_fast=True)
     token_cases, input_ids = export_token_cases(tokenizer)
-    arrays, generated = export_model_arrays(model_dir, input_ids, args.max_new_tokens)
+    arrays, generated, stop_reason = export_model_arrays(
+        model_dir,
+        input_ids,
+        args.max_new_tokens,
+    )
     generated_text = tokenizer.decode(generated, skip_special_tokens=False)
     write_fixtures(
         output_dir,
@@ -463,6 +572,8 @@ def main() -> None:
         arrays,
         generated,
         generated_text,
+        args.max_new_tokens,
+        stop_reason,
     )
     print(f"wrote {output_dir / 'fixtures.json'}")
     print(f"wrote {output_dir / 'fixtures.bin'}")

@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "environment": {
-    "commit": "5ba07c50e111fe6577f58206606b80820764d193",
+    "commit": "8db1ed5ee5a31f05fdbf52bb6735ff36d3653e65",
     "cpu": "11th Gen Intel(R) Core(TM) i5-11260H @ 2.60GHz",
     "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
     "python": "3.14.5"
@@ -11,7 +11,7 @@
     "accuracy": 0.8612,
     "macro_f1": 0.8615446457361582,
     "runtime_sample_max_abs_error": 2.86102294921875e-06,
-    "runtime_sample_inference_ms": 0.062,
+    "runtime_sample_inference_ms": 0.067,
     "runtime_sample_peak_live_bytes": 512,
     "per_class": [
       {
@@ -589,78 +589,4786 @@
     ]
   },
   "qwen": {
+    "reference": {
+      "system_prompt": "You are a concise inference systems tutor.",
+      "user_prompt": "Explain KV cache in one short sentence.",
+      "rendered_prompt": "<|im_start|>system\nYou are a concise inference systems tutor.<|im_end|>\n<|im_start|>user\nExplain KV cache in one short sentence.<|im_end|>\n<|im_start|>assistant\n",
+      "prompt_tokens": 30,
+      "generated_tokens": 24,
+      "decode_steps": 23,
+      "max_new_tokens": 64,
+      "stop_reason": "eos",
+      "generated_text": "A key-value cache stores data in memory to quickly retrieve values based on keys, typically for quick access to data.",
+      "layers": 24
+    },
+    "layer_metrics": [
+      {
+        "phase": "prefill",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 0",
+        "max_abs_error": 7.39097595215e-05,
+        "mean_abs_error": 1.36131867358e-06,
+        "cosine_similarity": 0.999999999931
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 1",
+        "max_abs_error": 7.29560852051e-05,
+        "mean_abs_error": 2.09889400421e-06,
+        "cosine_similarity": 0.99999999994
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 2",
+        "max_abs_error": 0.0030517578125,
+        "mean_abs_error": 2.91293438403e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 3",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.17336799266e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 4",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.3959899589e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 5",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.40645632865e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 6",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.34468643251e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 7",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.42234024651e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 8",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.516143815e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 9",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.49776120337e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 10",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.47423403929e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 11",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.53377316146e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 12",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.60694626319e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 13",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.81268030088e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 14",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 3.99746647981e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 15",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 4.24415216652e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 16",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 5.04520701811e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 17",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 5.92602752606e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 18",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 6.97231386896e-06,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 19",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 8.56123660924e-06,
+        "cosine_similarity": 0.999999999999
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 20",
+        "max_abs_error": 0.0018310546875,
+        "mean_abs_error": 1.07229191815e-05,
+        "cosine_similarity": 0.999999999999
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 21",
+        "max_abs_error": 0.00244140625,
+        "mean_abs_error": 1.2834050791e-05,
+        "cosine_similarity": 0.999999999934
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 22",
+        "max_abs_error": 0.00109672546387,
+        "mean_abs_error": 1.71439097141e-05,
+        "cosine_similarity": 0.999999999939
+      },
+      {
+        "phase": "prefill",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000654220581055,
+        "mean_abs_error": 2.03335376379e-05,
+        "cosine_similarity": 0.999999999882
+      },
+      {
+        "phase": "prefill",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.00310134887695,
+        "mean_abs_error": 7.90277011247e-05,
+        "cosine_similarity": 0.999999999899
+      },
+      {
+        "phase": "prefill",
+        "stage": "Logits",
+        "max_abs_error": 0.000150680541992,
+        "mean_abs_error": 2.14045440231e-05,
+        "cosine_similarity": 0.999999999956
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 0",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 7.22869507237e-07,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 1",
+        "max_abs_error": 6.45220279694e-06,
+        "mean_abs_error": 1.37946413556e-06,
+        "cosine_similarity": 0.999999999973
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 2",
+        "max_abs_error": 1.01327896118e-05,
+        "mean_abs_error": 1.62765802868e-06,
+        "cosine_similarity": 0.999999999967
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 3",
+        "max_abs_error": 1.04308128357e-05,
+        "mean_abs_error": 1.81068000009e-06,
+        "cosine_similarity": 0.999999999967
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 4",
+        "max_abs_error": 1.04904174805e-05,
+        "mean_abs_error": 1.76287513958e-06,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 5",
+        "max_abs_error": 9.59634780884e-06,
+        "mean_abs_error": 1.74198066816e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 6",
+        "max_abs_error": 1.03712081909e-05,
+        "mean_abs_error": 1.71040820922e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 7",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.57581728542e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 8",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.57552027044e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 9",
+        "max_abs_error": 9.83476638794e-06,
+        "mean_abs_error": 1.58988197135e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 10",
+        "max_abs_error": 9.17911529541e-06,
+        "mean_abs_error": 1.8024745389e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 11",
+        "max_abs_error": 8.46385955811e-06,
+        "mean_abs_error": 1.94995690046e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 12",
+        "max_abs_error": 1.23679637909e-05,
+        "mean_abs_error": 2.25900034171e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 13",
+        "max_abs_error": 1.71065330505e-05,
+        "mean_abs_error": 2.31715785048e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 14",
+        "max_abs_error": 2.58088111877e-05,
+        "mean_abs_error": 3.34144507568e-06,
+        "cosine_similarity": 0.999999999968
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 15",
+        "max_abs_error": 2.7060508728e-05,
+        "mean_abs_error": 4.47468794716e-06,
+        "cosine_similarity": 0.999999999961
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 16",
+        "max_abs_error": 3.01003456116e-05,
+        "mean_abs_error": 4.87621686521e-06,
+        "cosine_similarity": 0.99999999996
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 17",
+        "max_abs_error": 3.2365322113e-05,
+        "mean_abs_error": 5.22354509615e-06,
+        "cosine_similarity": 0.999999999967
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 18",
+        "max_abs_error": 3.40938568115e-05,
+        "mean_abs_error": 6.54857389496e-06,
+        "cosine_similarity": 0.99999999997
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 19",
+        "max_abs_error": 4.67300415039e-05,
+        "mean_abs_error": 8.20059878086e-06,
+        "cosine_similarity": 0.999999999968
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 20",
+        "max_abs_error": 5.81741333008e-05,
+        "mean_abs_error": 1.2147947148e-05,
+        "cosine_similarity": 0.999999999962
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 21",
+        "max_abs_error": 7.55786895752e-05,
+        "mean_abs_error": 1.46069983852e-05,
+        "cosine_similarity": 0.999999999965
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 22",
+        "max_abs_error": 8.89301300049e-05,
+        "mean_abs_error": 1.78746912362e-05,
+        "cosine_similarity": 0.999999999962
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Layer 23",
+        "max_abs_error": 9.53674316406e-05,
+        "mean_abs_error": 2.02828336374e-05,
+        "cosine_similarity": 0.999999999934
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000534057617188,
+        "mean_abs_error": 6.58652986333e-05,
+        "cosine_similarity": 0.999999999945
+      },
+      {
+        "phase": "decode_1",
+        "stage": "Logits",
+        "max_abs_error": 0.000178337097168,
+        "mean_abs_error": 2.58428518182e-05,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 0",
+        "max_abs_error": 8.92579555511e-06,
+        "mean_abs_error": 1.1637805853e-06,
+        "cosine_similarity": 0.999999999971
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 1",
+        "max_abs_error": 1.36494636536e-05,
+        "mean_abs_error": 1.71252031578e-06,
+        "cosine_similarity": 0.999999999965
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 2",
+        "max_abs_error": 1.85966491699e-05,
+        "mean_abs_error": 1.96444047365e-06,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 3",
+        "max_abs_error": 2.1755695343e-05,
+        "mean_abs_error": 2.4210556668e-06,
+        "cosine_similarity": 0.999999999962
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 4",
+        "max_abs_error": 2.09212303162e-05,
+        "mean_abs_error": 2.54122694189e-06,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 5",
+        "max_abs_error": 2.14576721191e-05,
+        "mean_abs_error": 2.56116826287e-06,
+        "cosine_similarity": 0.999999999965
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 6",
+        "max_abs_error": 2.43186950684e-05,
+        "mean_abs_error": 2.45180646224e-06,
+        "cosine_similarity": 0.999999999975
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 7",
+        "max_abs_error": 2.39610671997e-05,
+        "mean_abs_error": 3.55845051152e-06,
+        "cosine_similarity": 0.999999999958
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 8",
+        "max_abs_error": 2.75373458862e-05,
+        "mean_abs_error": 3.80925277048e-06,
+        "cosine_similarity": 0.999999999955
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 9",
+        "max_abs_error": 5.76972961426e-05,
+        "mean_abs_error": 5.58330170212e-06,
+        "cosine_similarity": 0.999999999903
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 10",
+        "max_abs_error": 4.06503677368e-05,
+        "mean_abs_error": 5.95390494189e-06,
+        "cosine_similarity": 0.999999999889
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 11",
+        "max_abs_error": 5.56707382202e-05,
+        "mean_abs_error": 8.50096486309e-06,
+        "cosine_similarity": 0.999999999798
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 12",
+        "max_abs_error": 9.14335250854e-05,
+        "mean_abs_error": 1.08148285238e-05,
+        "cosine_similarity": 0.999999999682
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 13",
+        "max_abs_error": 0.000128626823425,
+        "mean_abs_error": 1.32401593354e-05,
+        "cosine_similarity": 0.99999999949
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 14",
+        "max_abs_error": 0.000115036964417,
+        "mean_abs_error": 1.4627753574e-05,
+        "cosine_similarity": 0.99999999947
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 15",
+        "max_abs_error": 0.000144690275192,
+        "mean_abs_error": 1.88419175434e-05,
+        "cosine_similarity": 0.999999999325
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 16",
+        "max_abs_error": 0.000203117728233,
+        "mean_abs_error": 2.86993807614e-05,
+        "cosine_similarity": 0.999999998949
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 17",
+        "max_abs_error": 0.000229835510254,
+        "mean_abs_error": 3.54964473185e-05,
+        "cosine_similarity": 0.99999999893
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 18",
+        "max_abs_error": 0.000215329229832,
+        "mean_abs_error": 4.12745139329e-05,
+        "cosine_similarity": 0.999999998995
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 19",
+        "max_abs_error": 0.000223577022552,
+        "mean_abs_error": 4.73856925964e-05,
+        "cosine_similarity": 0.999999999204
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 20",
+        "max_abs_error": 0.000300347805023,
+        "mean_abs_error": 5.71531168784e-05,
+        "cosine_similarity": 0.999999999258
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 21",
+        "max_abs_error": 0.000406920909882,
+        "mean_abs_error": 6.50189966629e-05,
+        "cosine_similarity": 0.999999999199
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 22",
+        "max_abs_error": 0.000387609004974,
+        "mean_abs_error": 8.43494199216e-05,
+        "cosine_similarity": 0.999999999004
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000396966934204,
+        "mean_abs_error": 0.0001034516151,
+        "cosine_similarity": 0.999999997956
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.00184094905853,
+        "mean_abs_error": 0.000362091746086,
+        "cosine_similarity": 0.999999998261
+      },
+      {
+        "phase": "decode_2",
+        "stage": "Logits",
+        "max_abs_error": 0.00103974342346,
+        "mean_abs_error": 0.00015734550726,
+        "cosine_similarity": 0.999999998888
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 0",
+        "max_abs_error": 1.30236148834e-05,
+        "mean_abs_error": 8.27681495658e-07,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 1",
+        "max_abs_error": 9.89437103271e-06,
+        "mean_abs_error": 1.53162026046e-06,
+        "cosine_similarity": 0.999999999975
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 2",
+        "max_abs_error": 1.18613243103e-05,
+        "mean_abs_error": 2.41045511627e-06,
+        "cosine_similarity": 0.999999999963
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 3",
+        "max_abs_error": 1.3530254364e-05,
+        "mean_abs_error": 2.90035157897e-06,
+        "cosine_similarity": 0.999999999957
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 4",
+        "max_abs_error": 2.64644622803e-05,
+        "mean_abs_error": 3.79342236556e-06,
+        "cosine_similarity": 0.999999999941
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 5",
+        "max_abs_error": 1.84178352356e-05,
+        "mean_abs_error": 3.57553446e-06,
+        "cosine_similarity": 0.999999999952
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 6",
+        "max_abs_error": 1.85966491699e-05,
+        "mean_abs_error": 4.01868185561e-06,
+        "cosine_similarity": 0.999999999951
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 7",
+        "max_abs_error": 1.95652246475e-05,
+        "mean_abs_error": 4.24935881581e-06,
+        "cosine_similarity": 0.999999999953
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 8",
+        "max_abs_error": 1.78813934326e-05,
+        "mean_abs_error": 4.00620670657e-06,
+        "cosine_similarity": 0.999999999961
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 9",
+        "max_abs_error": 3.33786010742e-05,
+        "mean_abs_error": 3.85227706699e-06,
+        "cosine_similarity": 0.999999999968
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 10",
+        "max_abs_error": 2.09808349609e-05,
+        "mean_abs_error": 3.81666801072e-06,
+        "cosine_similarity": 0.99999999997
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 11",
+        "max_abs_error": 1.87158584595e-05,
+        "mean_abs_error": 4.00021963287e-06,
+        "cosine_similarity": 0.999999999969
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 12",
+        "max_abs_error": 3.24249267578e-05,
+        "mean_abs_error": 4.18462695961e-06,
+        "cosine_similarity": 0.999999999967
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 13",
+        "max_abs_error": 2.09808349609e-05,
+        "mean_abs_error": 4.4474329895e-06,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 14",
+        "max_abs_error": 2.11894512177e-05,
+        "mean_abs_error": 4.41710290033e-06,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 15",
+        "max_abs_error": 2.59876251221e-05,
+        "mean_abs_error": 5.36669748336e-06,
+        "cosine_similarity": 0.999999999955
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 16",
+        "max_abs_error": 4.82797622681e-05,
+        "mean_abs_error": 7.0998461784e-06,
+        "cosine_similarity": 0.999999999948
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 17",
+        "max_abs_error": 5.67436218262e-05,
+        "mean_abs_error": 7.63331939067e-06,
+        "cosine_similarity": 0.999999999955
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 18",
+        "max_abs_error": 6.96182250977e-05,
+        "mean_abs_error": 8.59126157593e-06,
+        "cosine_similarity": 0.999999999958
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 19",
+        "max_abs_error": 9.05990600586e-05,
+        "mean_abs_error": 1.01251664871e-05,
+        "cosine_similarity": 0.999999999954
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 20",
+        "max_abs_error": 0.000100135803223,
+        "mean_abs_error": 1.18829318256e-05,
+        "cosine_similarity": 0.999999999959
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 21",
+        "max_abs_error": 0.000103950500488,
+        "mean_abs_error": 1.33113540609e-05,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 22",
+        "max_abs_error": 9.84668731689e-05,
+        "mean_abs_error": 1.60914122327e-05,
+        "cosine_similarity": 0.999999999963
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Layer 23",
+        "max_abs_error": 7.66515731812e-05,
+        "mean_abs_error": 1.70506911153e-05,
+        "cosine_similarity": 0.99999999992
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000395774841309,
+        "mean_abs_error": 7.27396945877e-05,
+        "cosine_similarity": 0.99999999993
+      },
+      {
+        "phase": "decode_3",
+        "stage": "Logits",
+        "max_abs_error": 0.000187873840332,
+        "mean_abs_error": 2.92079045986e-05,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 0",
+        "max_abs_error": 1.4066696167e-05,
+        "mean_abs_error": 9.45367251656e-07,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 1",
+        "max_abs_error": 1.49607658386e-05,
+        "mean_abs_error": 1.46627358585e-06,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 2",
+        "max_abs_error": 1.93119049072e-05,
+        "mean_abs_error": 1.79024573299e-06,
+        "cosine_similarity": 0.999999999972
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 3",
+        "max_abs_error": 1.97887420654e-05,
+        "mean_abs_error": 2.01701134626e-06,
+        "cosine_similarity": 0.999999999972
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 4",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 2.38070788328e-06,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 5",
+        "max_abs_error": 9.74535942078e-06,
+        "mean_abs_error": 2.34825022614e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 6",
+        "max_abs_error": 9.29832458496e-06,
+        "mean_abs_error": 2.23305791483e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 7",
+        "max_abs_error": 1.02370977402e-05,
+        "mean_abs_error": 2.24669046085e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 8",
+        "max_abs_error": 1.57356262207e-05,
+        "mean_abs_error": 2.27694233347e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 9",
+        "max_abs_error": 1.50799751282e-05,
+        "mean_abs_error": 2.15447679303e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 10",
+        "max_abs_error": 1.43647193909e-05,
+        "mean_abs_error": 2.38207056619e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 11",
+        "max_abs_error": 1.17123126984e-05,
+        "mean_abs_error": 2.50717649968e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 12",
+        "max_abs_error": 1.37984752655e-05,
+        "mean_abs_error": 2.54678239539e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 13",
+        "max_abs_error": 1.27255916595e-05,
+        "mean_abs_error": 2.91500691674e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 14",
+        "max_abs_error": 1.55568122864e-05,
+        "mean_abs_error": 3.33369929909e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 15",
+        "max_abs_error": 2.83718109131e-05,
+        "mean_abs_error": 4.17824776378e-06,
+        "cosine_similarity": 0.999999999978
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 16",
+        "max_abs_error": 2.76565551758e-05,
+        "mean_abs_error": 4.52796978477e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 17",
+        "max_abs_error": 2.71797180176e-05,
+        "mean_abs_error": 5.22256699956e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 18",
+        "max_abs_error": 3.0517578125e-05,
+        "mean_abs_error": 6.09311350023e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 19",
+        "max_abs_error": 3.74615192413e-05,
+        "mean_abs_error": 7.01205863152e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 20",
+        "max_abs_error": 3.73125076294e-05,
+        "mean_abs_error": 7.7026530302e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 21",
+        "max_abs_error": 4.57763671875e-05,
+        "mean_abs_error": 8.70618636587e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 22",
+        "max_abs_error": 6.22272491455e-05,
+        "mean_abs_error": 1.03842217608e-05,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000198364257812,
+        "mean_abs_error": 1.20695913211e-05,
+        "cosine_similarity": 0.99999999997
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000429153442383,
+        "mean_abs_error": 3.95944424391e-05,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_4",
+        "stage": "Logits",
+        "max_abs_error": 9.6321105957e-05,
+        "mean_abs_error": 1.58324428343e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 0",
+        "max_abs_error": 1.42157077789e-05,
+        "mean_abs_error": 8.68524564014e-07,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 1",
+        "max_abs_error": 1.31726264954e-05,
+        "mean_abs_error": 1.25705420422e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 2",
+        "max_abs_error": 1.32322311401e-05,
+        "mean_abs_error": 1.59246389688e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 3",
+        "max_abs_error": 1.35898590088e-05,
+        "mean_abs_error": 1.64683375e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 4",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 1.63382147938e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 5",
+        "max_abs_error": 9.685754776e-06,
+        "mean_abs_error": 1.83918850131e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 6",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 1.85989301826e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 7",
+        "max_abs_error": 1.38282775879e-05,
+        "mean_abs_error": 1.52702991077e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 8",
+        "max_abs_error": 1.03712081909e-05,
+        "mean_abs_error": 1.60094142692e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 9",
+        "max_abs_error": 8.25524330139e-06,
+        "mean_abs_error": 1.42924285943e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 10",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.71123779832e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 11",
+        "max_abs_error": 8.27200710773e-06,
+        "mean_abs_error": 1.69499097475e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 12",
+        "max_abs_error": 9.22381877899e-06,
+        "mean_abs_error": 1.81107316166e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 13",
+        "max_abs_error": 1.24871730804e-05,
+        "mean_abs_error": 1.85726717713e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 14",
+        "max_abs_error": 1.38282775879e-05,
+        "mean_abs_error": 2.38626151778e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 15",
+        "max_abs_error": 1.82390213013e-05,
+        "mean_abs_error": 2.87926273553e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 16",
+        "max_abs_error": 1.80602073669e-05,
+        "mean_abs_error": 3.24437132804e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 17",
+        "max_abs_error": 1.8298625946e-05,
+        "mean_abs_error": 3.51534150208e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 18",
+        "max_abs_error": 2.76565551758e-05,
+        "mean_abs_error": 5.66278842078e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 19",
+        "max_abs_error": 3.33786010742e-05,
+        "mean_abs_error": 6.63955454781e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 20",
+        "max_abs_error": 3.59117984772e-05,
+        "mean_abs_error": 7.99509871285e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 21",
+        "max_abs_error": 3.62396240234e-05,
+        "mean_abs_error": 8.48632355753e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 22",
+        "max_abs_error": 7.62939453125e-05,
+        "mean_abs_error": 1.04293992211e-05,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Layer 23",
+        "max_abs_error": 7.24792480469e-05,
+        "mean_abs_error": 1.16818201994e-05,
+        "cosine_similarity": 0.999999999968
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000226974487305,
+        "mean_abs_error": 4.44479207675e-05,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_5",
+        "stage": "Logits",
+        "max_abs_error": 0.000126361846924,
+        "mean_abs_error": 1.91599988058e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 0",
+        "max_abs_error": 7.80820846558e-06,
+        "mean_abs_error": 5.9999183577e-07,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 1",
+        "max_abs_error": 5.96046447754e-06,
+        "mean_abs_error": 1.03016489967e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 2",
+        "max_abs_error": 7.2717666626e-06,
+        "mean_abs_error": 1.14985440242e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 3",
+        "max_abs_error": 9.41753387451e-06,
+        "mean_abs_error": 1.44570523324e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 4",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.83043968199e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 5",
+        "max_abs_error": 1.23977661133e-05,
+        "mean_abs_error": 1.69853332669e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 6",
+        "max_abs_error": 1.28746032715e-05,
+        "mean_abs_error": 1.63420814455e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 7",
+        "max_abs_error": 8.15093517303e-06,
+        "mean_abs_error": 1.60942012631e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 8",
+        "max_abs_error": 7.83801078796e-06,
+        "mean_abs_error": 1.61266923117e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 9",
+        "max_abs_error": 9.53674316406e-06,
+        "mean_abs_error": 1.49556009481e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 10",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.66053359862e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 11",
+        "max_abs_error": 9.77516174316e-06,
+        "mean_abs_error": 1.7848817931e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 12",
+        "max_abs_error": 1.52587890625e-05,
+        "mean_abs_error": 1.83006860815e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 13",
+        "max_abs_error": 1.08480453491e-05,
+        "mean_abs_error": 1.84666714631e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 14",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 2.58120313187e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 15",
+        "max_abs_error": 2.09808349609e-05,
+        "mean_abs_error": 2.95099951992e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 16",
+        "max_abs_error": 2.38418579102e-05,
+        "mean_abs_error": 3.3892294076e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 17",
+        "max_abs_error": 1.80006027222e-05,
+        "mean_abs_error": 3.47165769199e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 18",
+        "max_abs_error": 2.45571136475e-05,
+        "mean_abs_error": 4.82611358166e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 19",
+        "max_abs_error": 2.76267528534e-05,
+        "mean_abs_error": 5.85829755957e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 20",
+        "max_abs_error": 3.0517578125e-05,
+        "mean_abs_error": 6.58125749656e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 21",
+        "max_abs_error": 3.37362289429e-05,
+        "mean_abs_error": 7.27058795746e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 22",
+        "max_abs_error": 4.45246696472e-05,
+        "mean_abs_error": 9.32844289179e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Layer 23",
+        "max_abs_error": 5.41210174561e-05,
+        "mean_abs_error": 1.06562635795e-05,
+        "cosine_similarity": 0.999999999975
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000270843505859,
+        "mean_abs_error": 3.98652814511e-05,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_6",
+        "stage": "Logits",
+        "max_abs_error": 0.000113010406494,
+        "mean_abs_error": 1.8837314109e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 0",
+        "max_abs_error": 1.23977661133e-05,
+        "mean_abs_error": 6.18948433839e-07,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 1",
+        "max_abs_error": 7.5101852417e-06,
+        "mean_abs_error": 9.9783648823e-07,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 2",
+        "max_abs_error": 8.77678394318e-06,
+        "mean_abs_error": 1.07949225432e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 3",
+        "max_abs_error": 1.10566616058e-05,
+        "mean_abs_error": 1.40008991626e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 4",
+        "max_abs_error": 1.08480453491e-05,
+        "mean_abs_error": 1.67833163037e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 5",
+        "max_abs_error": 8.225440979e-06,
+        "mean_abs_error": 1.69008334134e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 6",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 1.72801290838e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 7",
+        "max_abs_error": 7.85291194916e-06,
+        "mean_abs_error": 1.55655808547e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 8",
+        "max_abs_error": 7.52508640289e-06,
+        "mean_abs_error": 1.60258631305e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 9",
+        "max_abs_error": 7.18235969543e-06,
+        "mean_abs_error": 1.71965075424e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 10",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.76413595909e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 11",
+        "max_abs_error": 8.82148742676e-06,
+        "mean_abs_error": 1.97754057548e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 12",
+        "max_abs_error": 1.04904174805e-05,
+        "mean_abs_error": 2.13856817157e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 13",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 2.03728684158e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 14",
+        "max_abs_error": 1.13844871521e-05,
+        "mean_abs_error": 2.34706593411e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 15",
+        "max_abs_error": 1.79409980774e-05,
+        "mean_abs_error": 3.04600273791e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 16",
+        "max_abs_error": 1.96695327759e-05,
+        "mean_abs_error": 3.48273066006e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 17",
+        "max_abs_error": 2.09808349609e-05,
+        "mean_abs_error": 3.65038782287e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 18",
+        "max_abs_error": 3.24249267578e-05,
+        "mean_abs_error": 5.12022857687e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 19",
+        "max_abs_error": 2.89380550385e-05,
+        "mean_abs_error": 6.20070828258e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 20",
+        "max_abs_error": 3.35574150085e-05,
+        "mean_abs_error": 7.65851083478e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 21",
+        "max_abs_error": 3.5285949707e-05,
+        "mean_abs_error": 8.61298342768e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 22",
+        "max_abs_error": 4.52995300293e-05,
+        "mean_abs_error": 1.04249899908e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Layer 23",
+        "max_abs_error": 5.14984130859e-05,
+        "mean_abs_error": 1.19352813012e-05,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000236511230469,
+        "mean_abs_error": 3.98328608883e-05,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_7",
+        "stage": "Logits",
+        "max_abs_error": 9.6321105957e-05,
+        "mean_abs_error": 1.76329651954e-05,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 0",
+        "max_abs_error": 9.29832458496e-06,
+        "mean_abs_error": 1.25986480271e-06,
+        "cosine_similarity": 0.999999999971
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 1",
+        "max_abs_error": 9.41753387451e-06,
+        "mean_abs_error": 1.70252003175e-06,
+        "cosine_similarity": 0.999999999969
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 2",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 2.02060969709e-06,
+        "cosine_similarity": 0.999999999966
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 3",
+        "max_abs_error": 8.82148742676e-06,
+        "mean_abs_error": 2.24518381791e-06,
+        "cosine_similarity": 0.999999999975
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 4",
+        "max_abs_error": 2.14576721191e-05,
+        "mean_abs_error": 2.44360749743e-06,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 5",
+        "max_abs_error": 9.77516174316e-06,
+        "mean_abs_error": 2.2518356023e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 6",
+        "max_abs_error": 9.43243503571e-06,
+        "mean_abs_error": 2.32996535487e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 7",
+        "max_abs_error": 1.33216381073e-05,
+        "mean_abs_error": 2.27429206591e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 8",
+        "max_abs_error": 1.24871730804e-05,
+        "mean_abs_error": 2.1888783002e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 9",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 2.12358593542e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 10",
+        "max_abs_error": 1.38282775879e-05,
+        "mean_abs_error": 2.02250157599e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 11",
+        "max_abs_error": 1.27851963043e-05,
+        "mean_abs_error": 2.49248322299e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 12",
+        "max_abs_error": 1.44243240356e-05,
+        "mean_abs_error": 2.50396052642e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 13",
+        "max_abs_error": 1.39772891998e-05,
+        "mean_abs_error": 2.65801437698e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 14",
+        "max_abs_error": 1.56313180923e-05,
+        "mean_abs_error": 2.94709025184e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 15",
+        "max_abs_error": 1.92299485207e-05,
+        "mean_abs_error": 3.37432200987e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 16",
+        "max_abs_error": 2.03549861908e-05,
+        "mean_abs_error": 3.90517483798e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 17",
+        "max_abs_error": 2.28881835938e-05,
+        "mean_abs_error": 4.10899935689e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 18",
+        "max_abs_error": 2.40206718445e-05,
+        "mean_abs_error": 4.71958732565e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 19",
+        "max_abs_error": 2.90870666504e-05,
+        "mean_abs_error": 5.97956074801e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 20",
+        "max_abs_error": 4.76837158203e-05,
+        "mean_abs_error": 7.0541864261e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 21",
+        "max_abs_error": 3.44514846802e-05,
+        "mean_abs_error": 7.82642330575e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 22",
+        "max_abs_error": 4.19616699219e-05,
+        "mean_abs_error": 9.32729744818e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Layer 23",
+        "max_abs_error": 6.05583190918e-05,
+        "mean_abs_error": 1.0817112135e-05,
+        "cosine_similarity": 0.999999999971
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000420093536377,
+        "mean_abs_error": 4.31256394222e-05,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_8",
+        "stage": "Logits",
+        "max_abs_error": 0.000136375427246,
+        "mean_abs_error": 1.68970705178e-05,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 0",
+        "max_abs_error": 1.44243240356e-05,
+        "mean_abs_error": 5.7230967546e-07,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 1",
+        "max_abs_error": 1.21593475342e-05,
+        "mean_abs_error": 1.02903114956e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 2",
+        "max_abs_error": 8.34465026855e-06,
+        "mean_abs_error": 1.33612047648e-06,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 3",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 1.80547379257e-06,
+        "cosine_similarity": 0.999999999973
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 4",
+        "max_abs_error": 1.57356262207e-05,
+        "mean_abs_error": 2.00581520663e-06,
+        "cosine_similarity": 0.999999999972
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 5",
+        "max_abs_error": 1.14440917969e-05,
+        "mean_abs_error": 1.82293920911e-06,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 6",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.69683023289e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 7",
+        "max_abs_error": 7.56978988647e-06,
+        "mean_abs_error": 1.64572598546e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 8",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 1.74764136318e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 9",
+        "max_abs_error": 8.28504562378e-06,
+        "mean_abs_error": 1.63969317717e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 10",
+        "max_abs_error": 8.10623168945e-06,
+        "mean_abs_error": 1.73694570549e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 11",
+        "max_abs_error": 8.70227813721e-06,
+        "mean_abs_error": 1.7401637576e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 12",
+        "max_abs_error": 9.32812690735e-06,
+        "mean_abs_error": 1.81394404665e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 13",
+        "max_abs_error": 1.13248825073e-05,
+        "mean_abs_error": 1.71345735518e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 14",
+        "max_abs_error": 1.44839286804e-05,
+        "mean_abs_error": 2.50741348801e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 15",
+        "max_abs_error": 2.14576721191e-05,
+        "mean_abs_error": 2.9406905274e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 16",
+        "max_abs_error": 2.16364860535e-05,
+        "mean_abs_error": 3.51725403951e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 17",
+        "max_abs_error": 2.30073928833e-05,
+        "mean_abs_error": 3.93509981222e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 18",
+        "max_abs_error": 2.37226486206e-05,
+        "mean_abs_error": 4.46171699358e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 19",
+        "max_abs_error": 2.59876251221e-05,
+        "mean_abs_error": 5.30032723743e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 20",
+        "max_abs_error": 7.24792480469e-05,
+        "mean_abs_error": 6.34343762483e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 21",
+        "max_abs_error": 5.72204589844e-05,
+        "mean_abs_error": 6.82685536698e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 22",
+        "max_abs_error": 8.01086425781e-05,
+        "mean_abs_error": 8.12621354791e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Layer 23",
+        "max_abs_error": 6.48498535156e-05,
+        "mean_abs_error": 9.2305729465e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000166893005371,
+        "mean_abs_error": 3.03438480062e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_9",
+        "stage": "Logits",
+        "max_abs_error": 9.25064086914e-05,
+        "mean_abs_error": 1.25755559121e-05,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 0",
+        "max_abs_error": 1.34706497192e-05,
+        "mean_abs_error": 7.74098875159e-07,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 1",
+        "max_abs_error": 9.46968793869e-06,
+        "mean_abs_error": 1.10180865574e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 2",
+        "max_abs_error": 1.1220574379e-05,
+        "mean_abs_error": 1.26673902352e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 3",
+        "max_abs_error": 1.06692314148e-05,
+        "mean_abs_error": 1.46161775254e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 4",
+        "max_abs_error": 8.34465026855e-06,
+        "mean_abs_error": 1.55231204449e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 5",
+        "max_abs_error": 7.68899917603e-06,
+        "mean_abs_error": 1.5821382736e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 6",
+        "max_abs_error": 1.00135803223e-05,
+        "mean_abs_error": 1.62292313429e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 7",
+        "max_abs_error": 9.41753387451e-06,
+        "mean_abs_error": 1.53303335537e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 8",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 1.48623491571e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 9",
+        "max_abs_error": 6.13927841187e-06,
+        "mean_abs_error": 1.35410768313e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 10",
+        "max_abs_error": 7.21216201782e-06,
+        "mean_abs_error": 1.45638685873e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 11",
+        "max_abs_error": 7.42077827454e-06,
+        "mean_abs_error": 1.56655733008e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 12",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.59610863193e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 13",
+        "max_abs_error": 1.25169754028e-05,
+        "mean_abs_error": 1.69182463391e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 14",
+        "max_abs_error": 1.56760215759e-05,
+        "mean_abs_error": 2.57736766278e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 15",
+        "max_abs_error": 1.78813934326e-05,
+        "mean_abs_error": 2.80854250637e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 16",
+        "max_abs_error": 2.19345092773e-05,
+        "mean_abs_error": 3.10566169251e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 17",
+        "max_abs_error": 1.84774398804e-05,
+        "mean_abs_error": 3.4068777625e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 18",
+        "max_abs_error": 2.05039978027e-05,
+        "mean_abs_error": 3.72062121252e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 19",
+        "max_abs_error": 2.19345092773e-05,
+        "mean_abs_error": 4.16441720777e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 20",
+        "max_abs_error": 2.86102294922e-05,
+        "mean_abs_error": 4.98003126787e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 21",
+        "max_abs_error": 2.67028808594e-05,
+        "mean_abs_error": 5.66865284262e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 22",
+        "max_abs_error": 4.19616699219e-05,
+        "mean_abs_error": 7.14271612066e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Layer 23",
+        "max_abs_error": 3.14712524414e-05,
+        "mean_abs_error": 8.1674786218e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000175476074219,
+        "mean_abs_error": 2.72053356249e-05,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_10",
+        "stage": "Logits",
+        "max_abs_error": 7.34329223633e-05,
+        "mean_abs_error": 1.1938198275e-05,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 0",
+        "max_abs_error": 1.41859054565e-05,
+        "mean_abs_error": 9.92605626899e-07,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 1",
+        "max_abs_error": 1.24424695969e-05,
+        "mean_abs_error": 1.3771002289e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 2",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 1.47398064395e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 3",
+        "max_abs_error": 1.23083591461e-05,
+        "mean_abs_error": 1.61859601836e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 4",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.61420861592e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 5",
+        "max_abs_error": 1.02519989014e-05,
+        "mean_abs_error": 1.89933156694e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 6",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 1.93944807896e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 7",
+        "max_abs_error": 1.03712081909e-05,
+        "mean_abs_error": 1.79423659574e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 8",
+        "max_abs_error": 1.07884407043e-05,
+        "mean_abs_error": 1.74650423495e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 9",
+        "max_abs_error": 1.01327896118e-05,
+        "mean_abs_error": 1.59434888961e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 10",
+        "max_abs_error": 9.65595245361e-06,
+        "mean_abs_error": 1.78464064707e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 11",
+        "max_abs_error": 9.29832458496e-06,
+        "mean_abs_error": 1.82162226078e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 12",
+        "max_abs_error": 1.08480453491e-05,
+        "mean_abs_error": 1.83079204622e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 13",
+        "max_abs_error": 1.07288360596e-05,
+        "mean_abs_error": 1.85629427766e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 14",
+        "max_abs_error": 1.58548355103e-05,
+        "mean_abs_error": 2.70940550503e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 15",
+        "max_abs_error": 1.62124633789e-05,
+        "mean_abs_error": 3.12078295143e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 16",
+        "max_abs_error": 2.03847885132e-05,
+        "mean_abs_error": 3.38751436045e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 17",
+        "max_abs_error": 2.26497650146e-05,
+        "mean_abs_error": 3.67304580452e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 18",
+        "max_abs_error": 2.98023223877e-05,
+        "mean_abs_error": 4.85428608954e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 19",
+        "max_abs_error": 3.67164611816e-05,
+        "mean_abs_error": 5.76395749314e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 20",
+        "max_abs_error": 4.57763671875e-05,
+        "mean_abs_error": 6.44469192983e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 21",
+        "max_abs_error": 4.10079956055e-05,
+        "mean_abs_error": 6.83656045502e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 22",
+        "max_abs_error": 4.54187393188e-05,
+        "mean_abs_error": 8.48342980524e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Layer 23",
+        "max_abs_error": 6.86645507812e-05,
+        "mean_abs_error": 9.30740082237e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000180244445801,
+        "mean_abs_error": 3.56238280282e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_11",
+        "stage": "Logits",
+        "max_abs_error": 9.05990600586e-05,
+        "mean_abs_error": 1.43505895241e-05,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 0",
+        "max_abs_error": 1.13844871521e-05,
+        "mean_abs_error": 7.81774490731e-07,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 1",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 1.41969212564e-06,
+        "cosine_similarity": 0.999999999973
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 2",
+        "max_abs_error": 1.34706497192e-05,
+        "mean_abs_error": 1.63283870539e-06,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 3",
+        "max_abs_error": 1.44243240356e-05,
+        "mean_abs_error": 1.73549259281e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 4",
+        "max_abs_error": 1.30534172058e-05,
+        "mean_abs_error": 2.05812830245e-06,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 5",
+        "max_abs_error": 1.05202198029e-05,
+        "mean_abs_error": 2.11684320155e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 6",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 2.27862931622e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 7",
+        "max_abs_error": 1.62124633789e-05,
+        "mean_abs_error": 2.00607194399e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 8",
+        "max_abs_error": 1.66893005371e-05,
+        "mean_abs_error": 1.88832720076e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 9",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 1.71438348064e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 10",
+        "max_abs_error": 2.24113464355e-05,
+        "mean_abs_error": 1.79003940762e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 11",
+        "max_abs_error": 1.18017196655e-05,
+        "mean_abs_error": 1.94994936464e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 12",
+        "max_abs_error": 1.33514404297e-05,
+        "mean_abs_error": 1.84451242343e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 13",
+        "max_abs_error": 1.23977661133e-05,
+        "mean_abs_error": 2.01183242357e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 14",
+        "max_abs_error": 2.38418579102e-05,
+        "mean_abs_error": 2.49150772496e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 15",
+        "max_abs_error": 1.90734863281e-05,
+        "mean_abs_error": 2.9949411068e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 16",
+        "max_abs_error": 2.19345092773e-05,
+        "mean_abs_error": 3.44043447902e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 17",
+        "max_abs_error": 2.53021717072e-05,
+        "mean_abs_error": 3.63902498585e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 18",
+        "max_abs_error": 2.77161598206e-05,
+        "mean_abs_error": 4.36098343926e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 19",
+        "max_abs_error": 2.56299972534e-05,
+        "mean_abs_error": 5.09903475177e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 20",
+        "max_abs_error": 2.67028808594e-05,
+        "mean_abs_error": 5.9990644721e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 21",
+        "max_abs_error": 2.78949737549e-05,
+        "mean_abs_error": 6.32468852148e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 22",
+        "max_abs_error": 3.75509262085e-05,
+        "mean_abs_error": 7.81054508739e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Layer 23",
+        "max_abs_error": 4.95910644531e-05,
+        "mean_abs_error": 9.10125839125e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000234603881836,
+        "mean_abs_error": 3.54514483791e-05,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_12",
+        "stage": "Logits",
+        "max_abs_error": 0.0001380443573,
+        "mean_abs_error": 1.40915167095e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 0",
+        "max_abs_error": 7.0333480835e-06,
+        "mean_abs_error": 7.92252389406e-07,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 1",
+        "max_abs_error": 6.79492950439e-06,
+        "mean_abs_error": 1.04741255719e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 2",
+        "max_abs_error": 7.15255737305e-06,
+        "mean_abs_error": 1.25061913942e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 3",
+        "max_abs_error": 8.40425491333e-06,
+        "mean_abs_error": 1.28728424897e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 4",
+        "max_abs_error": 8.225440979e-06,
+        "mean_abs_error": 1.3834064053e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 5",
+        "max_abs_error": 1.10864639282e-05,
+        "mean_abs_error": 1.72821585563e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 6",
+        "max_abs_error": 1.52587890625e-05,
+        "mean_abs_error": 1.66317581066e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 7",
+        "max_abs_error": 8.28504562378e-06,
+        "mean_abs_error": 1.79244255248e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 8",
+        "max_abs_error": 8.64267349243e-06,
+        "mean_abs_error": 1.71259619362e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 9",
+        "max_abs_error": 8.82148742676e-06,
+        "mean_abs_error": 1.57756591891e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 10",
+        "max_abs_error": 9.47713851929e-06,
+        "mean_abs_error": 1.75872992259e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 11",
+        "max_abs_error": 1.060962677e-05,
+        "mean_abs_error": 1.80417451442e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 12",
+        "max_abs_error": 1.03712081909e-05,
+        "mean_abs_error": 1.71579943396e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 13",
+        "max_abs_error": 1.00061297417e-05,
+        "mean_abs_error": 1.69951454154e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 14",
+        "max_abs_error": 1.13248825073e-05,
+        "mean_abs_error": 2.34285107581e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 15",
+        "max_abs_error": 2.00271606445e-05,
+        "mean_abs_error": 2.42554441294e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 16",
+        "max_abs_error": 3.31699848175e-05,
+        "mean_abs_error": 2.78635603276e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 17",
+        "max_abs_error": 3.24249267578e-05,
+        "mean_abs_error": 3.20917544221e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 18",
+        "max_abs_error": 3.33786010742e-05,
+        "mean_abs_error": 3.80676855067e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 19",
+        "max_abs_error": 3.49283218384e-05,
+        "mean_abs_error": 4.69856604468e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 20",
+        "max_abs_error": 4.95910644531e-05,
+        "mean_abs_error": 5.24343756427e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 21",
+        "max_abs_error": 3.95476818085e-05,
+        "mean_abs_error": 5.23932976648e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 22",
+        "max_abs_error": 4.08142805099e-05,
+        "mean_abs_error": 6.71857352635e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000148773193359,
+        "mean_abs_error": 7.43679785436e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000419616699219,
+        "mean_abs_error": 3.21577296875e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_13",
+        "stage": "Logits",
+        "max_abs_error": 8.74996185303e-05,
+        "mean_abs_error": 1.40881149739e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 0",
+        "max_abs_error": 9.29832458496e-06,
+        "mean_abs_error": 4.71339847406e-07,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 1",
+        "max_abs_error": 6.85453414917e-06,
+        "mean_abs_error": 1.12528349356e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 2",
+        "max_abs_error": 7.80820846558e-06,
+        "mean_abs_error": 1.30596059275e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 3",
+        "max_abs_error": 9.41753387451e-06,
+        "mean_abs_error": 1.39268273155e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 4",
+        "max_abs_error": 8.31484794617e-06,
+        "mean_abs_error": 1.34198281947e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 5",
+        "max_abs_error": 7.15255737305e-06,
+        "mean_abs_error": 1.45932114849e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 6",
+        "max_abs_error": 8.70227813721e-06,
+        "mean_abs_error": 1.36218711434e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 7",
+        "max_abs_error": 9.17911529541e-06,
+        "mean_abs_error": 1.78592745215e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 8",
+        "max_abs_error": 1.26957893372e-05,
+        "mean_abs_error": 1.6205137529e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 9",
+        "max_abs_error": 9.77516174316e-06,
+        "mean_abs_error": 1.46861358579e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 10",
+        "max_abs_error": 7.56978988647e-06,
+        "mean_abs_error": 1.60491202093e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 11",
+        "max_abs_error": 1.14440917969e-05,
+        "mean_abs_error": 1.69054588436e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 12",
+        "max_abs_error": 8.61287117004e-06,
+        "mean_abs_error": 1.6624206702e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 13",
+        "max_abs_error": 1.23381614685e-05,
+        "mean_abs_error": 1.78570735443e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 14",
+        "max_abs_error": 1.23977661133e-05,
+        "mean_abs_error": 2.47554271482e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 15",
+        "max_abs_error": 2.41994857788e-05,
+        "mean_abs_error": 3.07133762232e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 16",
+        "max_abs_error": 3.8743019104e-05,
+        "mean_abs_error": 3.54881090711e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 17",
+        "max_abs_error": 3.86834144592e-05,
+        "mean_abs_error": 3.69779081666e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 18",
+        "max_abs_error": 4.13656234741e-05,
+        "mean_abs_error": 4.38728706545e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 19",
+        "max_abs_error": 3.73125076294e-05,
+        "mean_abs_error": 5.0499511417e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 20",
+        "max_abs_error": 4.38690185547e-05,
+        "mean_abs_error": 6.07840567162e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 21",
+        "max_abs_error": 4.17232513428e-05,
+        "mean_abs_error": 6.44474805865e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 22",
+        "max_abs_error": 4.37498092651e-05,
+        "mean_abs_error": 7.81453231217e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Layer 23",
+        "max_abs_error": 4.50611114502e-05,
+        "mean_abs_error": 8.65009912689e-06,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000178337097168,
+        "mean_abs_error": 3.28203906455e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_14",
+        "stage": "Logits",
+        "max_abs_error": 8.05854797363e-05,
+        "mean_abs_error": 1.36112272492e-05,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 0",
+        "max_abs_error": 6.80983066559e-06,
+        "mean_abs_error": 6.31749831622e-07,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 1",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 1.2954678823e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 2",
+        "max_abs_error": 1.47819519043e-05,
+        "mean_abs_error": 1.58154892103e-06,
+        "cosine_similarity": 0.999999999978
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 3",
+        "max_abs_error": 1.31130218506e-05,
+        "mean_abs_error": 1.56924527671e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 4",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 1.90156216766e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 5",
+        "max_abs_error": 9.47713851929e-06,
+        "mean_abs_error": 1.8405179227e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 6",
+        "max_abs_error": 9.10460948944e-06,
+        "mean_abs_error": 1.90228768458e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 7",
+        "max_abs_error": 1.33514404297e-05,
+        "mean_abs_error": 1.72588832876e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 8",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.66289906442e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 9",
+        "max_abs_error": 8.37445259094e-06,
+        "mean_abs_error": 1.78929407671e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 10",
+        "max_abs_error": 8.82148742676e-06,
+        "mean_abs_error": 1.75389972615e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 11",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.92373928647e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 12",
+        "max_abs_error": 9.77516174316e-06,
+        "mean_abs_error": 2.02912529598e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 13",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 2.13905046361e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 14",
+        "max_abs_error": 1.80900096893e-05,
+        "mean_abs_error": 2.5567611114e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 15",
+        "max_abs_error": 1.78813934326e-05,
+        "mean_abs_error": 2.96166295552e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 16",
+        "max_abs_error": 2.22027301788e-05,
+        "mean_abs_error": 3.22844945393e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 17",
+        "max_abs_error": 2.19941139221e-05,
+        "mean_abs_error": 3.49839163911e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 18",
+        "max_abs_error": 2.15172767639e-05,
+        "mean_abs_error": 3.89517767222e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 19",
+        "max_abs_error": 2.32458114624e-05,
+        "mean_abs_error": 4.44150022564e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 20",
+        "max_abs_error": 4.38690185547e-05,
+        "mean_abs_error": 5.66915176543e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 21",
+        "max_abs_error": 4.95910644531e-05,
+        "mean_abs_error": 1.06229604821e-05,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 22",
+        "max_abs_error": 7.77244567871e-05,
+        "mean_abs_error": 1.64080369619e-05,
+        "cosine_similarity": 0.999999999951
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000116586685181,
+        "mean_abs_error": 2.03134279997e-05,
+        "cosine_similarity": 0.999999999872
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000846862792969,
+        "mean_abs_error": 9.02682648822e-05,
+        "cosine_similarity": 0.999999999873
+      },
+      {
+        "phase": "decode_15",
+        "stage": "Logits",
+        "max_abs_error": 0.000317096710205,
+        "mean_abs_error": 3.76042287706e-05,
+        "cosine_similarity": 0.999999999904
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 0",
+        "max_abs_error": 6.19888305664e-06,
+        "mean_abs_error": 4.75224429205e-07,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 1",
+        "max_abs_error": 1.78813934326e-05,
+        "mean_abs_error": 8.47560061499e-07,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 2",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.01996946406e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 3",
+        "max_abs_error": 1.33514404297e-05,
+        "mean_abs_error": 1.06882414132e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 4",
+        "max_abs_error": 7.86781311035e-06,
+        "mean_abs_error": 1.28880096132e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 5",
+        "max_abs_error": 6.2882900238e-06,
+        "mean_abs_error": 1.24856264197e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 6",
+        "max_abs_error": 6.19888305664e-06,
+        "mean_abs_error": 1.2650050069e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 7",
+        "max_abs_error": 6.49690628052e-06,
+        "mean_abs_error": 1.15910786138e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 8",
+        "max_abs_error": 7.15255737305e-06,
+        "mean_abs_error": 1.31193103568e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 9",
+        "max_abs_error": 8.10623168945e-06,
+        "mean_abs_error": 1.27941192269e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 10",
+        "max_abs_error": 8.04662704468e-06,
+        "mean_abs_error": 1.53504307881e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 11",
+        "max_abs_error": 9.53674316406e-06,
+        "mean_abs_error": 1.49527581276e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 12",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.56156654287e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 13",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.56506835732e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 14",
+        "max_abs_error": 1.44988298416e-05,
+        "mean_abs_error": 2.3355522509e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 15",
+        "max_abs_error": 1.41859054565e-05,
+        "mean_abs_error": 3.01407635561e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 16",
+        "max_abs_error": 2.37226486206e-05,
+        "mean_abs_error": 3.33085855735e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 17",
+        "max_abs_error": 2.3365020752e-05,
+        "mean_abs_error": 3.77457139881e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 18",
+        "max_abs_error": 2.44379043579e-05,
+        "mean_abs_error": 4.77211766078e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 19",
+        "max_abs_error": 2.77459621429e-05,
+        "mean_abs_error": 5.39203756489e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 20",
+        "max_abs_error": 3.30954790115e-05,
+        "mean_abs_error": 6.17980341693e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 21",
+        "max_abs_error": 2.98917293549e-05,
+        "mean_abs_error": 6.70367236515e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 22",
+        "max_abs_error": 3.08752059937e-05,
+        "mean_abs_error": 7.55157712514e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Layer 23",
+        "max_abs_error": 9.53674316406e-05,
+        "mean_abs_error": 8.70526959521e-06,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.00025749206543,
+        "mean_abs_error": 3.49779419204e-05,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_16",
+        "stage": "Logits",
+        "max_abs_error": 8.20159912109e-05,
+        "mean_abs_error": 1.45694376016e-05,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 0",
+        "max_abs_error": 4.64916229248e-06,
+        "mean_abs_error": 5.23142261954e-07,
+        "cosine_similarity": 0.999999999996
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 1",
+        "max_abs_error": 5.48362731934e-06,
+        "mean_abs_error": 9.44449961285e-07,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 2",
+        "max_abs_error": 6.49690628052e-06,
+        "mean_abs_error": 1.11504206351e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 3",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.37320707186e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 4",
+        "max_abs_error": 1.28746032715e-05,
+        "mean_abs_error": 1.35377117009e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 5",
+        "max_abs_error": 9.08970832825e-06,
+        "mean_abs_error": 1.36339492331e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 6",
+        "max_abs_error": 7.2717666626e-06,
+        "mean_abs_error": 1.26221389759e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 7",
+        "max_abs_error": 6.43730163574e-06,
+        "mean_abs_error": 1.17027034971e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 8",
+        "max_abs_error": 7.80820846558e-06,
+        "mean_abs_error": 1.30132165006e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 9",
+        "max_abs_error": 1.62124633789e-05,
+        "mean_abs_error": 1.19683733958e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 10",
+        "max_abs_error": 1.14440917969e-05,
+        "mean_abs_error": 1.44038910678e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 11",
+        "max_abs_error": 1.81198120117e-05,
+        "mean_abs_error": 1.47211955794e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 12",
+        "max_abs_error": 1.14440917969e-05,
+        "mean_abs_error": 1.59409371138e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 13",
+        "max_abs_error": 6.85453414917e-06,
+        "mean_abs_error": 1.59073429781e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 14",
+        "max_abs_error": 1.62124633789e-05,
+        "mean_abs_error": 2.38018193548e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 15",
+        "max_abs_error": 2.09808349609e-05,
+        "mean_abs_error": 3.06607502612e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 16",
+        "max_abs_error": 2.67028808594e-05,
+        "mean_abs_error": 3.44415145394e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 17",
+        "max_abs_error": 2.65836715698e-05,
+        "mean_abs_error": 3.71164683851e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 18",
+        "max_abs_error": 3.03089618683e-05,
+        "mean_abs_error": 4.66967217757e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 19",
+        "max_abs_error": 3.86834144592e-05,
+        "mean_abs_error": 5.07594501999e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 20",
+        "max_abs_error": 4.43458557129e-05,
+        "mean_abs_error": 5.86004586824e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 21",
+        "max_abs_error": 4.52399253845e-05,
+        "mean_abs_error": 6.57079259067e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 22",
+        "max_abs_error": 4.85181808472e-05,
+        "mean_abs_error": 7.95068626758e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000118255615234,
+        "mean_abs_error": 9.10689829782e-06,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000263214111328,
+        "mean_abs_error": 3.59605349201e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_17",
+        "stage": "Logits",
+        "max_abs_error": 9.05990600586e-05,
+        "mean_abs_error": 1.42524976472e-05,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 0",
+        "max_abs_error": 7.42077827454e-06,
+        "mean_abs_error": 4.37627802187e-07,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 1",
+        "max_abs_error": 6.67572021484e-06,
+        "mean_abs_error": 9.62439246775e-07,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 2",
+        "max_abs_error": 6.25848770142e-06,
+        "mean_abs_error": 1.20648993678e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 3",
+        "max_abs_error": 7.46548175812e-06,
+        "mean_abs_error": 1.45793780705e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 4",
+        "max_abs_error": 7.15255737305e-06,
+        "mean_abs_error": 1.46794679625e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 5",
+        "max_abs_error": 8.28504562378e-06,
+        "mean_abs_error": 1.65960747316e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 6",
+        "max_abs_error": 1.060962677e-05,
+        "mean_abs_error": 1.49993346505e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 7",
+        "max_abs_error": 9.41753387451e-06,
+        "mean_abs_error": 1.43171863393e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 8",
+        "max_abs_error": 7.18235969543e-06,
+        "mean_abs_error": 1.50393108405e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 9",
+        "max_abs_error": 1.00135803223e-05,
+        "mean_abs_error": 1.39832679581e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 10",
+        "max_abs_error": 6.49690628052e-06,
+        "mean_abs_error": 1.52552820509e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 11",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 1.60006103605e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 12",
+        "max_abs_error": 9.28342342377e-06,
+        "mean_abs_error": 1.6177899462e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 13",
+        "max_abs_error": 7.92741775513e-06,
+        "mean_abs_error": 1.61992128207e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 14",
+        "max_abs_error": 1.37090682983e-05,
+        "mean_abs_error": 2.45918844095e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 15",
+        "max_abs_error": 1.77621841431e-05,
+        "mean_abs_error": 2.70765095982e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 16",
+        "max_abs_error": 1.92821025848e-05,
+        "mean_abs_error": 2.89093025328e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 17",
+        "max_abs_error": 1.96695327759e-05,
+        "mean_abs_error": 3.17156705673e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 18",
+        "max_abs_error": 2.24113464355e-05,
+        "mean_abs_error": 3.90717676575e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 19",
+        "max_abs_error": 2.34842300415e-05,
+        "mean_abs_error": 4.52632541835e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 20",
+        "max_abs_error": 3.43322753906e-05,
+        "mean_abs_error": 5.60280542621e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 21",
+        "max_abs_error": 3.27825546265e-05,
+        "mean_abs_error": 6.42579938618e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 22",
+        "max_abs_error": 4.04119491577e-05,
+        "mean_abs_error": 7.91793406409e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Layer 23",
+        "max_abs_error": 4.52995300293e-05,
+        "mean_abs_error": 8.84283716524e-06,
+        "cosine_similarity": 0.99999999998
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000260591506958,
+        "mean_abs_error": 3.54532920548e-05,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_18",
+        "stage": "Logits",
+        "max_abs_error": 8.90493392944e-05,
+        "mean_abs_error": 1.4069078052e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 0",
+        "max_abs_error": 7.7486038208e-06,
+        "mean_abs_error": 6.76174620042e-07,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 1",
+        "max_abs_error": 6.0498714447e-06,
+        "mean_abs_error": 1.1789176954e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 2",
+        "max_abs_error": 7.15255737305e-06,
+        "mean_abs_error": 1.35171272372e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 3",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 1.58773478428e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 4",
+        "max_abs_error": 1.02519989014e-05,
+        "mean_abs_error": 1.55680195998e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 5",
+        "max_abs_error": 7.92741775513e-06,
+        "mean_abs_error": 1.71442973494e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 6",
+        "max_abs_error": 1.85966491699e-05,
+        "mean_abs_error": 1.81648725369e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 7",
+        "max_abs_error": 1.02519989014e-05,
+        "mean_abs_error": 1.98253006342e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 8",
+        "max_abs_error": 9.77516174316e-06,
+        "mean_abs_error": 1.92776548959e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 9",
+        "max_abs_error": 9.65595245361e-06,
+        "mean_abs_error": 1.85969526813e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 10",
+        "max_abs_error": 8.73208045959e-06,
+        "mean_abs_error": 1.83666010603e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 11",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 2.02756356365e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 12",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.85998734586e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 13",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 1.82424472379e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 14",
+        "max_abs_error": 1.28746032715e-05,
+        "mean_abs_error": 2.11705212548e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 15",
+        "max_abs_error": 1.54674053192e-05,
+        "mean_abs_error": 2.30198202189e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 16",
+        "max_abs_error": 2.14576721191e-05,
+        "mean_abs_error": 2.55783171659e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 17",
+        "max_abs_error": 2.02655792236e-05,
+        "mean_abs_error": 2.87321745418e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 18",
+        "max_abs_error": 2.07424163818e-05,
+        "mean_abs_error": 3.42656442496e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 19",
+        "max_abs_error": 2.55703926086e-05,
+        "mean_abs_error": 4.08164175626e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 20",
+        "max_abs_error": 3.43322753906e-05,
+        "mean_abs_error": 4.8604561016e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 21",
+        "max_abs_error": 2.74181365967e-05,
+        "mean_abs_error": 5.6139210106e-06,
+        "cosine_similarity": 0.999999999995
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 22",
+        "max_abs_error": 3.64780426025e-05,
+        "mean_abs_error": 6.774839546e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Layer 23",
+        "max_abs_error": 6.103515625e-05,
+        "mean_abs_error": 7.85785128496e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000251770019531,
+        "mean_abs_error": 2.80691404311e-05,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_19",
+        "stage": "Logits",
+        "max_abs_error": 7.72476196289e-05,
+        "mean_abs_error": 1.20738833384e-05,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 0",
+        "max_abs_error": 3.90410423279e-06,
+        "mean_abs_error": 7.69521193433e-07,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 1",
+        "max_abs_error": 1.02519989014e-05,
+        "mean_abs_error": 1.18470104228e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 2",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 1.35865047923e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 3",
+        "max_abs_error": 7.9870223999e-06,
+        "mean_abs_error": 1.48923728765e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 4",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.66188900559e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 5",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.70086215283e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 6",
+        "max_abs_error": 6.91413879395e-06,
+        "mean_abs_error": 1.66281928874e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 7",
+        "max_abs_error": 7.2717666626e-06,
+        "mean_abs_error": 1.76335951047e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 8",
+        "max_abs_error": 7.39097595215e-06,
+        "mean_abs_error": 1.78565616287e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 9",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.61670842707e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 10",
+        "max_abs_error": 7.86781311035e-06,
+        "mean_abs_error": 1.59900810104e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 11",
+        "max_abs_error": 1.43051147461e-05,
+        "mean_abs_error": 1.65428017291e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 12",
+        "max_abs_error": 1.04904174805e-05,
+        "mean_abs_error": 1.58669718076e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 13",
+        "max_abs_error": 8.61287117004e-06,
+        "mean_abs_error": 1.67202025685e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 14",
+        "max_abs_error": 1.28746032715e-05,
+        "mean_abs_error": 2.35898291326e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 15",
+        "max_abs_error": 1.62720680237e-05,
+        "mean_abs_error": 2.73013366885e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 16",
+        "max_abs_error": 1.71661376953e-05,
+        "mean_abs_error": 3.0428444526e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 17",
+        "max_abs_error": 1.88201665878e-05,
+        "mean_abs_error": 3.35301073002e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 18",
+        "max_abs_error": 2.01463699341e-05,
+        "mean_abs_error": 3.71362693841e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 19",
+        "max_abs_error": 2.19345092773e-05,
+        "mean_abs_error": 4.23593987112e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 20",
+        "max_abs_error": 3.81469726562e-05,
+        "mean_abs_error": 5.38489049567e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 21",
+        "max_abs_error": 2.64346599579e-05,
+        "mean_abs_error": 5.96476352907e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 22",
+        "max_abs_error": 3.85046005249e-05,
+        "mean_abs_error": 8.31530737092e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Layer 23",
+        "max_abs_error": 6.103515625e-05,
+        "mean_abs_error": 9.75749156039e-06,
+        "cosine_similarity": 0.999999999975
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000343322753906,
+        "mean_abs_error": 4.01322421177e-05,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_20",
+        "stage": "Logits",
+        "max_abs_error": 0.000153779983521,
+        "mean_abs_error": 1.54757787052e-05,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 0",
+        "max_abs_error": 9.53674316406e-06,
+        "mean_abs_error": 4.84231609984e-07,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 1",
+        "max_abs_error": 5.48362731934e-06,
+        "mean_abs_error": 1.01010612395e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 2",
+        "max_abs_error": 7.09295272827e-06,
+        "mean_abs_error": 1.14641131534e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 3",
+        "max_abs_error": 8.76188278198e-06,
+        "mean_abs_error": 1.37036399142e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 4",
+        "max_abs_error": 9.53674316406e-06,
+        "mean_abs_error": 1.53275816826e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 5",
+        "max_abs_error": 1.01923942566e-05,
+        "mean_abs_error": 1.59180074531e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 6",
+        "max_abs_error": 2.14576721191e-05,
+        "mean_abs_error": 1.45435998482e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 7",
+        "max_abs_error": 1.19209289551e-05,
+        "mean_abs_error": 1.48024238505e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 8",
+        "max_abs_error": 2.24113464355e-05,
+        "mean_abs_error": 1.55286085958e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 9",
+        "max_abs_error": 2.00271606445e-05,
+        "mean_abs_error": 1.51758493822e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 10",
+        "max_abs_error": 1.47819519043e-05,
+        "mean_abs_error": 1.52986623496e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 11",
+        "max_abs_error": 1.33514404297e-05,
+        "mean_abs_error": 1.40184680017e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 12",
+        "max_abs_error": 1.00135803223e-05,
+        "mean_abs_error": 1.39075460278e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 13",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 1.55874814871e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 14",
+        "max_abs_error": 1.78217887878e-05,
+        "mean_abs_error": 2.56815733987e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 15",
+        "max_abs_error": 2.08020210266e-05,
+        "mean_abs_error": 2.96014228037e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 16",
+        "max_abs_error": 2.74181365967e-05,
+        "mean_abs_error": 3.15722510485e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 17",
+        "max_abs_error": 2.67028808594e-05,
+        "mean_abs_error": 3.33148428971e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 18",
+        "max_abs_error": 2.72989273071e-05,
+        "mean_abs_error": 4.39241245788e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 19",
+        "max_abs_error": 3.67164611816e-05,
+        "mean_abs_error": 5.30651076198e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 20",
+        "max_abs_error": 7.62939453125e-05,
+        "mean_abs_error": 6.410012637e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 21",
+        "max_abs_error": 3.81469726562e-05,
+        "mean_abs_error": 6.85261745405e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 22",
+        "max_abs_error": 5.72204589844e-05,
+        "mean_abs_error": 8.4389175754e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000152587890625,
+        "mean_abs_error": 9.81529436623e-06,
+        "cosine_similarity": 0.999999999972
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000268936157227,
+        "mean_abs_error": 3.89983954717e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_21",
+        "stage": "Logits",
+        "max_abs_error": 9.64403152466e-05,
+        "mean_abs_error": 1.54500042341e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 0",
+        "max_abs_error": 4.61935997009e-06,
+        "mean_abs_error": 5.94048028038e-07,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 1",
+        "max_abs_error": 8.34465026855e-06,
+        "mean_abs_error": 1.04096138135e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 2",
+        "max_abs_error": 9.29832458496e-06,
+        "mean_abs_error": 1.17704985314e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 3",
+        "max_abs_error": 9.26852226257e-06,
+        "mean_abs_error": 1.34858834956e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 4",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.64221169793e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 5",
+        "max_abs_error": 8.10623168945e-06,
+        "mean_abs_error": 1.45933622012e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 6",
+        "max_abs_error": 8.10623168945e-06,
+        "mean_abs_error": 1.48584149429e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 7",
+        "max_abs_error": 9.17911529541e-06,
+        "mean_abs_error": 1.46541294401e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 8",
+        "max_abs_error": 8.82148742676e-06,
+        "mean_abs_error": 1.465641552e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 9",
+        "max_abs_error": 7.86781311035e-06,
+        "mean_abs_error": 1.68083871748e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 10",
+        "max_abs_error": 1.04904174805e-05,
+        "mean_abs_error": 1.60969336451e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 11",
+        "max_abs_error": 8.58306884766e-06,
+        "mean_abs_error": 1.76268804353e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 12",
+        "max_abs_error": 1.33514404297e-05,
+        "mean_abs_error": 1.68774022313e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 13",
+        "max_abs_error": 1.30534172058e-05,
+        "mean_abs_error": 1.73244344686e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 14",
+        "max_abs_error": 1.63912773132e-05,
+        "mean_abs_error": 2.48350780956e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 15",
+        "max_abs_error": 2.2292137146e-05,
+        "mean_abs_error": 2.86692998738e-06,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 16",
+        "max_abs_error": 2.61068344116e-05,
+        "mean_abs_error": 3.15305286287e-06,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 17",
+        "max_abs_error": 2.46167182922e-05,
+        "mean_abs_error": 3.22894733732e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 18",
+        "max_abs_error": 2.54511833191e-05,
+        "mean_abs_error": 3.91337744077e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 19",
+        "max_abs_error": 3.06963920593e-05,
+        "mean_abs_error": 4.53236030548e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 20",
+        "max_abs_error": 2.70009040833e-05,
+        "mean_abs_error": 5.59057973857e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 21",
+        "max_abs_error": 2.8133392334e-05,
+        "mean_abs_error": 6.19551948538e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 22",
+        "max_abs_error": 3.57627868652e-05,
+        "mean_abs_error": 7.65777284479e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Layer 23",
+        "max_abs_error": 0.000110626220703,
+        "mean_abs_error": 9.34338978758e-06,
+        "cosine_similarity": 0.999999999976
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000217437744141,
+        "mean_abs_error": 3.76685806194e-05,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "phase": "decode_22",
+        "stage": "Logits",
+        "max_abs_error": 0.000187158584595,
+        "mean_abs_error": 1.6180547069e-05,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Embedding",
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "cosine_similarity": 1.0
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 0",
+        "max_abs_error": 1.27553939819e-05,
+        "mean_abs_error": 6.2646641449e-07,
+        "cosine_similarity": 0.999999999974
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 1",
+        "max_abs_error": 2.24113464355e-05,
+        "mean_abs_error": 1.02859199355e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 2",
+        "max_abs_error": 1.1682510376e-05,
+        "mean_abs_error": 1.04204907205e-06,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 3",
+        "max_abs_error": 8.10623168945e-06,
+        "mean_abs_error": 1.03750945917e-06,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 4",
+        "max_abs_error": 5.36441802979e-06,
+        "mean_abs_error": 1.46606778019e-06,
+        "cosine_similarity": 0.999999999981
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 5",
+        "max_abs_error": 7.62939453125e-06,
+        "mean_abs_error": 1.35964988398e-06,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 6",
+        "max_abs_error": 6.95884227753e-06,
+        "mean_abs_error": 1.35109101913e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 7",
+        "max_abs_error": 6.39259815216e-06,
+        "mean_abs_error": 1.32207943742e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 8",
+        "max_abs_error": 1.09672546387e-05,
+        "mean_abs_error": 1.29371255753e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 9",
+        "max_abs_error": 1.23977661133e-05,
+        "mean_abs_error": 1.10944633239e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 10",
+        "max_abs_error": 9.05990600586e-06,
+        "mean_abs_error": 1.25051311833e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 11",
+        "max_abs_error": 6.88433647156e-06,
+        "mean_abs_error": 1.1988647332e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 12",
+        "max_abs_error": 1.14440917969e-05,
+        "mean_abs_error": 1.42987794659e-06,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 13",
+        "max_abs_error": 1.66893005371e-05,
+        "mean_abs_error": 1.51404466513e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 14",
+        "max_abs_error": 9.07480716705e-06,
+        "mean_abs_error": 2.02723770469e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 15",
+        "max_abs_error": 1.18613243103e-05,
+        "mean_abs_error": 2.19419494637e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 16",
+        "max_abs_error": 1.47819519043e-05,
+        "mean_abs_error": 2.61022692679e-06,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 17",
+        "max_abs_error": 1.52587890625e-05,
+        "mean_abs_error": 2.91420604169e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 18",
+        "max_abs_error": 1.90734863281e-05,
+        "mean_abs_error": 3.34996626147e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 19",
+        "max_abs_error": 2.18152999878e-05,
+        "mean_abs_error": 3.68538478922e-06,
+        "cosine_similarity": 0.999999999992
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 20",
+        "max_abs_error": 2.45571136475e-05,
+        "mean_abs_error": 4.56007130976e-06,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 21",
+        "max_abs_error": 4.19616699219e-05,
+        "mean_abs_error": 7.09059947569e-06,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 22",
+        "max_abs_error": 6.48498535156e-05,
+        "mean_abs_error": 9.03782867161e-06,
+        "cosine_similarity": 0.999999999989
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Layer 23",
+        "max_abs_error": 4.95910644531e-05,
+        "mean_abs_error": 1.0845068443e-05,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Final RMSNorm",
+        "max_abs_error": 0.000221729278564,
+        "mean_abs_error": 3.84932847218e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "phase": "decode_23",
+        "stage": "Logits",
+        "max_abs_error": 9.91821289062e-05,
+        "mean_abs_error": 1.55029820273e-05,
+        "cosine_similarity": 0.999999999976
+      }
+    ],
     "correctness": [
       {
         "step": 0,
-        "max_abs_error": 0.000292301,
-        "mean_abs_error": 5.1278e-05
+        "phase": "prefill",
+        "max_abs_error": 0.000150680541992,
+        "mean_abs_error": 2.14045440231e-05,
+        "cosine_similarity": 0.999999999956
       },
       {
         "step": 1,
-        "max_abs_error": 0.000186205,
-        "mean_abs_error": 3.00687e-05
+        "phase": "decode_1",
+        "max_abs_error": 0.000178337097168,
+        "mean_abs_error": 2.58428518182e-05,
+        "cosine_similarity": 0.999999999966
       },
       {
         "step": 2,
-        "max_abs_error": 0.000181437,
-        "mean_abs_error": 2.56228e-05
+        "phase": "decode_2",
+        "max_abs_error": 0.00103974342346,
+        "mean_abs_error": 0.00015734550726,
+        "cosine_similarity": 0.999999998888
+      },
+      {
+        "step": 3,
+        "phase": "decode_3",
+        "max_abs_error": 0.000187873840332,
+        "mean_abs_error": 2.92079045986e-05,
+        "cosine_similarity": 0.999999999979
+      },
+      {
+        "step": 4,
+        "phase": "decode_4",
+        "max_abs_error": 9.6321105957e-05,
+        "mean_abs_error": 1.58324428343e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "step": 5,
+        "phase": "decode_5",
+        "max_abs_error": 0.000126361846924,
+        "mean_abs_error": 1.91599988058e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "step": 6,
+        "phase": "decode_6",
+        "max_abs_error": 0.000113010406494,
+        "mean_abs_error": 1.8837314109e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "step": 7,
+        "phase": "decode_7",
+        "max_abs_error": 9.6321105957e-05,
+        "mean_abs_error": 1.76329651954e-05,
+        "cosine_similarity": 0.999999999987
+      },
+      {
+        "step": 8,
+        "phase": "decode_8",
+        "max_abs_error": 0.000136375427246,
+        "mean_abs_error": 1.68970705178e-05,
+        "cosine_similarity": 0.999999999982
+      },
+      {
+        "step": 9,
+        "phase": "decode_9",
+        "max_abs_error": 9.25064086914e-05,
+        "mean_abs_error": 1.25755559121e-05,
+        "cosine_similarity": 0.999999999993
+      },
+      {
+        "step": 10,
+        "phase": "decode_10",
+        "max_abs_error": 7.34329223633e-05,
+        "mean_abs_error": 1.1938198275e-05,
+        "cosine_similarity": 0.999999999994
+      },
+      {
+        "step": 11,
+        "phase": "decode_11",
+        "max_abs_error": 9.05990600586e-05,
+        "mean_abs_error": 1.43505895241e-05,
+        "cosine_similarity": 0.99999999999
+      },
+      {
+        "step": 12,
+        "phase": "decode_12",
+        "max_abs_error": 0.0001380443573,
+        "mean_abs_error": 1.40915167095e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "step": 13,
+        "phase": "decode_13",
+        "max_abs_error": 8.74996185303e-05,
+        "mean_abs_error": 1.40881149739e-05,
+        "cosine_similarity": 0.999999999986
+      },
+      {
+        "step": 14,
+        "phase": "decode_14",
+        "max_abs_error": 8.05854797363e-05,
+        "mean_abs_error": 1.36112272492e-05,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "step": 15,
+        "phase": "decode_15",
+        "max_abs_error": 0.000317096710205,
+        "mean_abs_error": 3.76042287706e-05,
+        "cosine_similarity": 0.999999999904
+      },
+      {
+        "step": 16,
+        "phase": "decode_16",
+        "max_abs_error": 8.20159912109e-05,
+        "mean_abs_error": 1.45694376016e-05,
+        "cosine_similarity": 0.999999999985
+      },
+      {
+        "step": 17,
+        "phase": "decode_17",
+        "max_abs_error": 9.05990600586e-05,
+        "mean_abs_error": 1.42524976472e-05,
+        "cosine_similarity": 0.999999999984
+      },
+      {
+        "step": 18,
+        "phase": "decode_18",
+        "max_abs_error": 8.90493392944e-05,
+        "mean_abs_error": 1.4069078052e-05,
+        "cosine_similarity": 0.999999999988
+      },
+      {
+        "step": 19,
+        "phase": "decode_19",
+        "max_abs_error": 7.72476196289e-05,
+        "mean_abs_error": 1.20738833384e-05,
+        "cosine_similarity": 0.999999999991
+      },
+      {
+        "step": 20,
+        "phase": "decode_20",
+        "max_abs_error": 0.000153779983521,
+        "mean_abs_error": 1.54757787052e-05,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "step": 21,
+        "phase": "decode_21",
+        "max_abs_error": 9.64403152466e-05,
+        "mean_abs_error": 1.54500042341e-05,
+        "cosine_similarity": 0.999999999983
+      },
+      {
+        "step": 22,
+        "phase": "decode_22",
+        "max_abs_error": 0.000187158584595,
+        "mean_abs_error": 1.6180547069e-05,
+        "cosine_similarity": 0.999999999977
+      },
+      {
+        "step": 23,
+        "phase": "decode_23",
+        "max_abs_error": 9.91821289062e-05,
+        "mean_abs_error": 1.55029820273e-05,
+        "cosine_similarity": 0.999999999976
       }
     ],
+    "performance_prompt": {
+      "system_prompt": "You are a helpful assistant.",
+      "user_prompt": "Explain KV cache in one short sentence.",
+      "max_new_tokens": 64
+    },
     "performance": [
       {
         "run": 1,
         "prompt_tokens": 28,
-        "generated_tokens": 8,
-        "prefill_ms": 1241.179,
-        "decode_ms": 1501.903,
-        "decode_ms_per_token": 214.55757142857144,
-        "decode_tokens_per_second": 4.661,
-        "generated_tokens_per_second": 2.916,
-        "text": "A cache is a temporary storage device that"
+        "generated_tokens": 17,
+        "prefill_ms": 671.359,
+        "decode_ms": 2201.47,
+        "decode_ms_per_token": 137.591875,
+        "decode_tokens_per_second": 7.268,
+        "generated_tokens_per_second": 5.918,
+        "text": "A cache is a temporary storage device that stores frequently accessed data to improve performance."
       },
       {
         "run": 2,
         "prompt_tokens": 28,
-        "generated_tokens": 8,
-        "prefill_ms": 972.781,
-        "decode_ms": 1281.65,
-        "decode_ms_per_token": 183.09285714285716,
-        "decode_tokens_per_second": 5.462,
-        "generated_tokens_per_second": 3.549,
-        "text": "A cache is a temporary storage device that"
+        "generated_tokens": 17,
+        "prefill_ms": 780.706,
+        "decode_ms": 1946.464,
+        "decode_ms_per_token": 121.654,
+        "decode_tokens_per_second": 8.22,
+        "generated_tokens_per_second": 6.234,
+        "text": "A cache is a temporary storage device that stores frequently accessed data to improve performance."
       },
       {
         "run": 3,
         "prompt_tokens": 28,
-        "generated_tokens": 8,
-        "prefill_ms": 1042.27,
-        "decode_ms": 1231.433,
-        "decode_ms_per_token": 175.919,
-        "decode_tokens_per_second": 5.684,
-        "generated_tokens_per_second": 3.518,
-        "text": "A cache is a temporary storage device that"
+        "generated_tokens": 17,
+        "prefill_ms": 838.544,
+        "decode_ms": 2288.003,
+        "decode_ms_per_token": 143.0001875,
+        "decode_tokens_per_second": 6.993,
+        "generated_tokens_per_second": 5.437,
+        "text": "A cache is a temporary storage device that stores frequently accessed data to improve performance."
       },
       {
         "run": 4,
         "prompt_tokens": 28,
-        "generated_tokens": 8,
-        "prefill_ms": 1094.18,
-        "decode_ms": 1306.92,
-        "decode_ms_per_token": 186.70285714285714,
-        "decode_tokens_per_second": 5.356,
-        "generated_tokens_per_second": 3.332,
-        "text": "A cache is a temporary storage device that"
+        "generated_tokens": 17,
+        "prefill_ms": 659.931,
+        "decode_ms": 1953.885,
+        "decode_ms_per_token": 122.1178125,
+        "decode_tokens_per_second": 8.189,
+        "generated_tokens_per_second": 6.504,
+        "text": "A cache is a temporary storage device that stores frequently accessed data to improve performance."
       },
       {
         "run": 5,
         "prompt_tokens": 28,
-        "generated_tokens": 8,
-        "prefill_ms": 1302.047,
-        "decode_ms": 1388.948,
-        "decode_ms_per_token": 198.42114285714288,
-        "decode_tokens_per_second": 5.04,
-        "generated_tokens_per_second": 2.973,
-        "text": "A cache is a temporary storage device that"
+        "generated_tokens": 17,
+        "prefill_ms": 670.271,
+        "decode_ms": 1767.09,
+        "decode_ms_per_token": 110.443125,
+        "decode_tokens_per_second": 9.054,
+        "generated_tokens_per_second": 6.975,
+        "text": "A cache is a temporary storage device that stores frequently accessed data to improve performance."
       }
     ]
   },
@@ -672,9 +5380,9 @@
         "query_heads": "8",
         "kv_heads": "8",
         "group_size": "1",
-        "full_recompute_us": "3472.8",
-        "kv_cached_us": "324.0",
-        "speedup": "10.7",
+        "full_recompute_us": "2942.3",
+        "kv_cached_us": "273.6",
+        "speedup": "10.8",
         "cache_bytes": "32768",
         "cache_saving_vs_mha": "0.000",
         "checksum_delta": "0.000"
@@ -685,9 +5393,9 @@
         "query_heads": "8",
         "kv_heads": "2",
         "group_size": "4",
-        "full_recompute_us": "3428.6",
-        "kv_cached_us": "363.7",
-        "speedup": "9.4",
+        "full_recompute_us": "3001.4",
+        "kv_cached_us": "283.2",
+        "speedup": "10.6",
         "cache_bytes": "8192",
         "cache_saving_vs_mha": "0.750",
         "checksum_delta": "0.000"
@@ -698,9 +5406,9 @@
         "query_heads": "8",
         "kv_heads": "1",
         "group_size": "8",
-        "full_recompute_us": "4226.6",
-        "kv_cached_us": "497.9",
-        "speedup": "8.5",
+        "full_recompute_us": "3176.7",
+        "kv_cached_us": "321.2",
+        "speedup": "9.9",
         "cache_bytes": "4096",
         "cache_saving_vs_mha": "0.875",
         "checksum_delta": "0.000"
@@ -711,9 +5419,9 @@
         "query_heads": "8",
         "kv_heads": "8",
         "group_size": "1",
-        "full_recompute_us": "28392.5",
-        "kv_cached_us": "1634.3",
-        "speedup": "17.4",
+        "full_recompute_us": "24426.9",
+        "kv_cached_us": "1070.6",
+        "speedup": "22.8",
         "cache_bytes": "65536",
         "cache_saving_vs_mha": "0.000",
         "checksum_delta": "0.000"
@@ -724,9 +5432,9 @@
         "query_heads": "8",
         "kv_heads": "2",
         "group_size": "4",
-        "full_recompute_us": "28139.4",
-        "kv_cached_us": "1464.2",
-        "speedup": "19.2",
+        "full_recompute_us": "23231.3",
+        "kv_cached_us": "1245.1",
+        "speedup": "18.7",
         "cache_bytes": "16384",
         "cache_saving_vs_mha": "0.750",
         "checksum_delta": "0.000"
@@ -737,9 +5445,9 @@
         "query_heads": "8",
         "kv_heads": "1",
         "group_size": "8",
-        "full_recompute_us": "29805.5",
-        "kv_cached_us": "1363.2",
-        "speedup": "21.9",
+        "full_recompute_us": "22930.8",
+        "kv_cached_us": "1089.8",
+        "speedup": "21.0",
         "cache_bytes": "8192",
         "cache_saving_vs_mha": "0.875",
         "checksum_delta": "0.000"
@@ -750,9 +5458,9 @@
         "query_heads": "8",
         "kv_heads": "8",
         "group_size": "1",
-        "full_recompute_us": "103811.9",
-        "kv_cached_us": "3437.8",
-        "speedup": "30.2",
+        "full_recompute_us": "87228.8",
+        "kv_cached_us": "2718.3",
+        "speedup": "32.1",
         "cache_bytes": "98304",
         "cache_saving_vs_mha": "0.000",
         "checksum_delta": "0.000"
@@ -763,9 +5471,9 @@
         "query_heads": "8",
         "kv_heads": "2",
         "group_size": "4",
-        "full_recompute_us": "113431.7",
-        "kv_cached_us": "3880.4",
-        "speedup": "29.2",
+        "full_recompute_us": "82523.3",
+        "kv_cached_us": "2770.4",
+        "speedup": "29.8",
         "cache_bytes": "24576",
         "cache_saving_vs_mha": "0.750",
         "checksum_delta": "0.000"
@@ -776,9 +5484,9 @@
         "query_heads": "8",
         "kv_heads": "1",
         "group_size": "8",
-        "full_recompute_us": "98319.8",
-        "kv_cached_us": "3020.3",
-        "speedup": "32.6",
+        "full_recompute_us": "76833.5",
+        "kv_cached_us": "2410.7",
+        "speedup": "31.9",
         "cache_bytes": "12288",
         "cache_saving_vs_mha": "0.875",
         "checksum_delta": "0.000"
@@ -835,30 +5543,30 @@
     "linear": [
       {
         "case": "prefill_32x896_to_4864",
-        "serial_ms": 49.879,
-        "threaded_ms": 13.869,
-        "speedup": 3.596,
+        "serial_ms": 28.297,
+        "threaded_ms": 5.189,
+        "speedup": 5.453,
         "selected": "threaded"
       },
       {
         "case": "decode_1x896_to_128",
-        "serial_ms": 0.028,
-        "threaded_ms": 0.35,
-        "speedup": 0.079,
+        "serial_ms": 0.018,
+        "threaded_ms": 0.219,
+        "speedup": 0.083,
         "selected": "serial"
       },
       {
         "case": "decode_1x896_to_896",
-        "serial_ms": 0.437,
-        "threaded_ms": 0.47,
-        "speedup": 0.929,
+        "serial_ms": 0.129,
+        "threaded_ms": 0.313,
+        "speedup": 0.413,
         "selected": "serial"
       },
       {
         "case": "decode_1x896_to_4864",
-        "serial_ms": 2.577,
-        "threaded_ms": 1.362,
-        "speedup": 1.892,
+        "serial_ms": 1.049,
+        "threaded_ms": 0.655,
+        "speedup": 1.601,
         "selected": "threaded"
       }
     ],
@@ -873,10 +5581,10 @@
       "planned_managed_buffers": "3",
       "planned_arena_bytes": "49152",
       "planned_value_reuses": "9",
-      "unplanned_batch_mean_median_us": "14.167",
-      "unplanned_batch_mean_p95_us": "16.403",
-      "planned_batch_mean_median_us": "9.634",
-      "planned_batch_mean_p95_us": "13.142"
+      "unplanned_batch_mean_median_us": "9.205",
+      "unplanned_batch_mean_p95_us": "10.721",
+      "planned_batch_mean_median_us": "6.8",
+      "planned_batch_mean_p95_us": "8.029"
     },
     "memory_plan_runs": [
       {
@@ -890,10 +5598,10 @@
         "planned_managed_buffers": "3",
         "planned_arena_bytes": "49152",
         "planned_value_reuses": "9",
-        "unplanned_batch_mean_median_us": "15.276",
-        "unplanned_batch_mean_p95_us": "18.120",
-        "planned_batch_mean_median_us": "11.617",
-        "planned_batch_mean_p95_us": "14.938"
+        "unplanned_batch_mean_median_us": "8.943",
+        "unplanned_batch_mean_p95_us": "10.721",
+        "planned_batch_mean_median_us": "6.576",
+        "planned_batch_mean_p95_us": "8.029"
       },
       {
         "build": "release",
@@ -906,10 +5614,10 @@
         "planned_managed_buffers": "3",
         "planned_arena_bytes": "49152",
         "planned_value_reuses": "9",
-        "unplanned_batch_mean_median_us": "15.918",
-        "unplanned_batch_mean_p95_us": "21.474",
-        "planned_batch_mean_median_us": "9.387",
-        "planned_batch_mean_p95_us": "12.195"
+        "unplanned_batch_mean_median_us": "9.186",
+        "unplanned_batch_mean_p95_us": "10.754",
+        "planned_batch_mean_median_us": "6.769",
+        "planned_batch_mean_p95_us": "8.530"
       },
       {
         "build": "release",
@@ -922,10 +5630,10 @@
         "planned_managed_buffers": "3",
         "planned_arena_bytes": "49152",
         "planned_value_reuses": "9",
-        "unplanned_batch_mean_median_us": "13.913",
-        "unplanned_batch_mean_p95_us": "15.723",
-        "planned_batch_mean_median_us": "12.287",
-        "planned_batch_mean_p95_us": "15.598"
+        "unplanned_batch_mean_median_us": "9.205",
+        "unplanned_batch_mean_p95_us": "10.973",
+        "planned_batch_mean_median_us": "6.802",
+        "planned_batch_mean_p95_us": "7.509"
       },
       {
         "build": "release",
@@ -938,10 +5646,10 @@
         "planned_managed_buffers": "3",
         "planned_arena_bytes": "49152",
         "planned_value_reuses": "9",
-        "unplanned_batch_mean_median_us": "14.167",
-        "unplanned_batch_mean_p95_us": "16.403",
-        "planned_batch_mean_median_us": "9.634",
-        "planned_batch_mean_p95_us": "13.142"
+        "unplanned_batch_mean_median_us": "9.438",
+        "unplanned_batch_mean_p95_us": "10.355",
+        "planned_batch_mean_median_us": "6.914",
+        "planned_batch_mean_p95_us": "8.513"
       },
       {
         "build": "release",
@@ -954,10 +5662,10 @@
         "planned_managed_buffers": "3",
         "planned_arena_bytes": "49152",
         "planned_value_reuses": "9",
-        "unplanned_batch_mean_median_us": "12.592",
-        "unplanned_batch_mean_p95_us": "15.475",
-        "planned_batch_mean_median_us": "8.058",
-        "planned_batch_mean_p95_us": "10.310"
+        "unplanned_batch_mean_median_us": "9.400",
+        "unplanned_batch_mean_p95_us": "10.488",
+        "planned_batch_mean_median_us": "6.800",
+        "planned_batch_mean_p95_us": "7.226"
       }
     ]
   }

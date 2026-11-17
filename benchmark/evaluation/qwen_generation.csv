@@ -1,6 +1,6 @@
 run,prompt_tokens,generated_tokens,prefill_ms,decode_ms,decode_ms_per_token,decode_tokens_per_second,generated_tokens_per_second,text
-1,28,8,1241.179,1501.903,214.55757142857144,4.661,2.916,A cache is a temporary storage device that
-2,28,8,972.781,1281.65,183.09285714285716,5.462,3.549,A cache is a temporary storage device that
-3,28,8,1042.27,1231.433,175.919,5.684,3.518,A cache is a temporary storage device that
-4,28,8,1094.18,1306.92,186.70285714285714,5.356,3.332,A cache is a temporary storage device that
-5,28,8,1302.047,1388.948,198.42114285714288,5.04,2.973,A cache is a temporary storage device that
+1,28,17,671.359,2201.47,137.591875,7.268,5.918,A cache is a temporary storage device that stores frequently accessed data to improve performance.
+2,28,17,780.706,1946.464,121.654,8.22,6.234,A cache is a temporary storage device that stores frequently accessed data to improve performance.
+3,28,17,838.544,2288.003,143.0001875,6.993,5.437,A cache is a temporary storage device that stores frequently accessed data to improve performance.
+4,28,17,659.931,1953.885,122.1178125,8.189,6.504,A cache is a temporary storage device that stores frequently accessed data to improve performance.
+5,28,17,670.271,1767.09,110.443125,9.054,6.975,A cache is a temporary storage device that stores frequently accessed data to improve performance.
