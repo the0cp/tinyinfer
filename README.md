@@ -75,13 +75,51 @@ cmake --build build-tsan --parallel
 ctest --test-dir build-tsan --output-on-failure
 ```
 
+## Prepare models
+
+Models are stored under `models/`
+
+### Qwen2.5-0.5B-Instruct
+
+Download the pinned checkpoint and convert it to tinyinfer's BF16 format:
+
+```bash
+python3 -m venv build/qwen-env
+source build/qwen-env/bin/activate
+python -m pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r tools/qwen-reference-requirements.txt
+
+huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct \
+  --revision 7ae557604adf67be50417f59c2c2f167def9a775 \
+  --local-dir models/sources/qwen2.5-0.5b-instruct-hf
+
+python tools/convert_qwen2.py \
+  --model-dir models/sources/qwen2.5-0.5b-instruct-hf \
+  --output-dir models/qwen2.5-0.5b
+```
+
+### Fashion-MNIST
+
+Download the dataset, train the example MLP and export it:
+
+```bash
+python3 -m venv build/fashion-env
+source build/fashion-env/bin/activate
+python -m pip install numpy
+
+python tools/prepare_fashion_mnist.py \
+  --data-dir models/fashion-mnist-data \
+  --output-dir models/fashion-mnist-final \
+  --tinyinfer build-release/tinyinfer
+```
+
 ## Generate text
 
-The model directory must contain `model.tiq`, its referenced `weights.bin`, and the original `tokenizer.json`.
+The Qwen directory must contain `model.tiq`, `weights.bin` and `tokenizer.json`.
 
 ```bash
 ./build-release/tinyinfer generate \
-  /path/to/model-directory \
+  models/qwen2.5-0.5b \
   "Explain KV cache in one sentence." \
   32
 ```
@@ -94,22 +132,11 @@ The input file contains contiguous little-endian FP32 values matching the model 
 
 ```bash
 ./build-release/tinyinfer run \
-  /path/to/model.ti \
-  /path/to/input.f32
+  models/fashion-mnist-final/model.ti \
+  models/fashion-mnist-final/sample.f32
 ```
 
 The command prints the output tensor, its `argmax`, runtime latency and peak managed activation bytes.
-
-Fashion-MNIST model preparation uses NumPy outside the C++ runtime:
-
-```bash
-python3 -m venv build/fashion-env
-source build/fashion-env/bin/activate
-python -m pip install numpy
-python tools/prepare_fashion_mnist.py \
-  --output-dir build/fashion-mnist \
-  --tinyinfer build-release/tinyinfer
-```
 
 ## Graph examples
 

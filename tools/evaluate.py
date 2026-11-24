@@ -54,7 +54,7 @@ CLI_SYSTEM_PROMPT = "You are a helpful assistant."
 
 
 def parse_args() -> argparse.Namespace:
-    default_models = Path.home() / "tinyinfer-models"
+    default_models = ROOT / "models"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build-release")
     parser.add_argument(
