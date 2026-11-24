@@ -20,7 +20,8 @@ if [[ ! -x "$python" ]]; then
 fi
 
 "$uv_command" pip install --python "$python" \
-    torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+    torch==2.4.1 torchvision==0.19.1 \
+    --index-url https://download.pytorch.org/whl/cpu
 "$uv_command" pip install --python "$python" \
     -r tools/qwen-reference-requirements.txt \
     -r tools/evaluation-requirements.txt

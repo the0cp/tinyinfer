@@ -23,7 +23,7 @@ namespace{
 using Clock = std::chrono::steady_clock;
 
 constexpr std::string_view system_prompt = "You are a helpful assistant.";
-constexpr size_t default_max_new_tokens = 32;
+constexpr size_t default_max_new_tokens = 1024;
 
 size_t parse_max_new_tokens(std::string_view text){
     size_t value = 0;

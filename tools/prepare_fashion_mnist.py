@@ -4,37 +4,16 @@
 from __future__ import annotations
 
 import argparse
-import gzip
-import hashlib
 import subprocess
-import urllib.request
 from pathlib import Path
 
 import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+from torchvision.datasets import FashionMNIST
 
 
-BASE_URL = (
-    "https://raw.githubusercontent.com/zalandoresearch/"
-    "fashion-mnist/master/data/fashion"
-)
-FILES = {
-    "train-images": (
-        "train-images-idx3-ubyte.gz",
-        "3aede38d61863908ad78613f6a32ed271626dd12800ba2636569512369268a84",
-    ),
-    "train-labels": (
-        "train-labels-idx1-ubyte.gz",
-        "a04f17134ac03560a47e3764e11b92fc97de4d1bfaf8ba1a3aa29af54cc90845",
-    ),
-    "test-images": (
-        "t10k-images-idx3-ubyte.gz",
-        "346e55b948d973a97e58d2351dde16a484bd415d4595297633bb08f03db6a073",
-    ),
-    "test-labels": (
-        "t10k-labels-idx1-ubyte.gz",
-        "67da17c76eaffca5446c3361aaab5c3cd6d1c2608764d35dfb1850b086bf8dd5",
-    ),
-}
 CLASS_NAMES = (
     "T-shirt/top",
     "Trouser",
@@ -71,101 +50,64 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def download_dataset(directory: Path) -> dict[str, Path]:
-    directory.mkdir(parents=True, exist_ok=True)
-    paths: dict[str, Path] = {}
+def load_dataset(directory: Path) -> tuple[torch.Tensor, ...]:
+    train = FashionMNIST(directory, train=True, download=True)
+    test = FashionMNIST(directory, train=False, download=True)
 
-    for name, (filename, expected_hash) in FILES.items():
-        path = directory / filename
-        if not path.exists():
-            print(f"downloading {filename}")
-            urllib.request.urlretrieve(f"{BASE_URL}/{filename}", path)
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_hash:
-            raise ValueError(f"SHA-256 mismatch: {path}")
-        paths[name] = path
-
-    return paths
+    train_images = train.data.reshape(-1, 784).float() / 255.0
+    test_images = test.data.reshape(-1, 784).float() / 255.0
+    return train_images, train.targets, test_images, test.targets
 
 
-def read_images(path: Path) -> np.ndarray:
-    with gzip.open(path, "rb") as stream:
-        data = stream.read()
-
-    images = np.frombuffer(data, dtype=np.uint8, offset=16)
-    return images.reshape(-1, 784).astype(np.float32) / 255.0
-
-
-def read_labels(path: Path) -> np.ndarray:
-    with gzip.open(path, "rb") as stream:
-        data = stream.read()
-
-    return np.frombuffer(data, dtype=np.uint8, offset=8).astype(np.int64)
-
-
-def train(
-    images: np.ndarray,
-    labels: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    rng = np.random.default_rng(SEED)
-    input_size = images.shape[1]
-    weight1 = (
-        rng.standard_normal((input_size, HIDDEN_SIZE)).astype(np.float32)
-        * np.float32(np.sqrt(2.0 / input_size))
+def train_model(images: torch.Tensor, labels: torch.Tensor) -> nn.Sequential:
+    torch.manual_seed(SEED)
+    model = nn.Sequential(
+        nn.Linear(784, HIDDEN_SIZE),
+        nn.ReLU(),
+        nn.Linear(HIDDEN_SIZE, len(CLASS_NAMES)),
     )
-    bias1 = np.zeros(HIDDEN_SIZE, dtype=np.float32)
-    weight2 = (
-        rng.standard_normal((HIDDEN_SIZE, len(CLASS_NAMES))).astype(np.float32)
-        * np.float32(np.sqrt(2.0 / HIDDEN_SIZE))
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        lr=LEARNING_RATE,
+        momentum=0.9,
     )
-    bias2 = np.zeros(len(CLASS_NAMES), dtype=np.float32)
+    loss_function = nn.CrossEntropyLoss()
+    batches = DataLoader(
+        TensorDataset(images, labels),
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        generator=torch.Generator().manual_seed(SEED),
+    )
 
+    model.train()
     for epoch in range(EPOCHS):
-        order = rng.permutation(images.shape[0])
-        for begin in range(0, order.size, BATCH_SIZE):
-            indices = order[begin : begin + BATCH_SIZE]
-            inputs = images[indices]
-            targets = labels[indices]
-
-            preactivation = inputs @ weight1 + bias1
-            hidden = np.maximum(preactivation, 0.0)
-            logits = hidden @ weight2 + bias2
-            logits -= logits.max(axis=1, keepdims=True)
-            probabilities = np.exp(logits)
-            probabilities /= probabilities.sum(axis=1, keepdims=True)
-            probabilities[np.arange(indices.size), targets] -= 1.0
-            probabilities /= indices.size
-
-            hidden_gradient = probabilities @ weight2.T
-            hidden_gradient[preactivation <= 0.0] = 0.0
-            weight2 -= LEARNING_RATE * (hidden.T @ probabilities)
-            bias2 -= LEARNING_RATE * probabilities.sum(axis=0)
-            weight1 -= LEARNING_RATE * (inputs.T @ hidden_gradient)
-            bias1 -= LEARNING_RATE * hidden_gradient.sum(axis=0)
-
+        for inputs, targets in batches:
+            optimizer.zero_grad()
+            loss = loss_function(model(inputs), targets)
+            loss.backward()
+            optimizer.step()
         print(f"epoch={epoch + 1}")
 
-    return weight1, bias1, weight2, bias2
+    return model.eval()
 
 
-def write_model(
-    directory: Path,
-    weights: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-) -> Path:
+def write_model(directory: Path, model: nn.Sequential) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     manifest_path = directory / "model.ti"
     weights_path = directory / "weights.bin"
     arrays = (
-        ("fc1.weight", weights[0]),
-        ("fc1.bias", weights[1]),
-        ("fc2.weight", weights[2]),
-        ("fc2.bias", weights[3]),
+        ("fc1.weight", model[0].weight.T),
+        ("fc1.bias", model[0].bias),
+        ("fc2.weight", model[2].weight.T),
+        ("fc2.bias", model[2].bias),
     )
 
     entries: list[tuple[str, tuple[int, ...], int, int]] = []
     offset = 0
     with weights_path.open("wb") as stream:
-        for name, array in arrays:
-            payload = np.asarray(array, dtype="<f4").tobytes(order="C")
+        for name, tensor in arrays:
+            array = tensor.detach().contiguous().numpy().astype("<f4", copy=False)
+            payload = array.tobytes(order="C")
             stream.write(payload)
             entries.append((name, array.shape, offset, len(payload)))
             offset += len(payload)
@@ -174,7 +116,7 @@ def write_model(
         "TINYINFER_MODEL 1",
         "weights weights.bin",
         "",
-        f"input input 2 1 {weights[0].shape[0]}",
+        "input input 2 1 784",
         "output logits",
         "",
     ]
@@ -235,25 +177,20 @@ def main() -> None:
     if existing:
         raise FileExistsError("refusing to overwrite: " + ", ".join(map(str, existing)))
 
-    paths = download_dataset(args.data_dir)
-    train_images = read_images(paths["train-images"])
-    train_labels = read_labels(paths["train-labels"])
-    test_images = read_images(paths["test-images"])
-    test_labels = read_labels(paths["test-labels"])
+    train_images, train_labels, test_images, test_labels = load_dataset(args.data_dir)
+    model = train_model(train_images, train_labels)
+    with torch.inference_mode():
+        test_logits = model(test_images)
+        predictions = test_logits.argmax(dim=1)
 
-    weights = train(train_images, train_labels)
-    weight1, bias1, weight2, bias2 = weights
-    test_logits = np.maximum(test_images @ weight1 + bias1, 0.0) @ weight2 + bias2
-    predictions = np.argmax(test_logits, axis=1)
-    accuracy = float(np.mean(predictions == test_labels))
-
-    manifest = write_model(args.output_dir, weights)
-    sample = test_images[SAMPLE_INDEX : SAMPLE_INDEX + 1]
-    expected = test_logits[SAMPLE_INDEX]
+    accuracy = float((predictions == test_labels).float().mean())
+    manifest = write_model(args.output_dir, model)
+    sample = test_images[SAMPLE_INDEX : SAMPLE_INDEX + 1].numpy().astype("<f4")
+    expected = test_logits[SAMPLE_INDEX].numpy().astype("<f4")
     input_path = args.output_dir / "sample.f32"
     expected_path = args.output_dir / "expected.f32"
-    input_path.write_bytes(np.asarray(sample, dtype="<f4").tobytes(order="C"))
-    expected_path.write_bytes(np.asarray(expected, dtype="<f4").tobytes(order="C"))
+    input_path.write_bytes(sample.tobytes(order="C"))
+    expected_path.write_bytes(expected.tobytes(order="C"))
 
     label = int(test_labels[SAMPLE_INDEX])
     prediction = int(predictions[SAMPLE_INDEX])
@@ -265,7 +202,12 @@ def main() -> None:
     print(f"wrote {expected_path}")
 
     if args.tinyinfer:
-        verify_runtime(args.tinyinfer.resolve(), manifest.resolve(), input_path.resolve(), expected)
+        verify_runtime(
+            args.tinyinfer.resolve(),
+            manifest.resolve(),
+            input_path.resolve(),
+            expected,
+        )
 
 
 if __name__ == "__main__":

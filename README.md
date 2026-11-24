@@ -94,7 +94,7 @@ Generation needs `model.tiq`, `weights.bin` and `tokenizer.json`. Model evaluati
   "Explain KV cache in one sentence."
 ```
 
-`max-new-tokens` is optional, defaults to 32, and must be positive. The command reports token counts, Prefill latency, Decode latency and throughput.
+`max-new-tokens` is optional, defaults to 1024, and must be positive. Generation stops earlier at EOS. The command reports token counts, Prefill latency, Decode latency and throughput.
 
 ## Run a graph
 
