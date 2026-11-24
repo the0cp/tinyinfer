@@ -99,10 +99,14 @@ def parse_args() -> argparse.Namespace:
 def run(*command: object) -> str:
     result = subprocess.run(
         [str(value) for value in command],
-        check=True,
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "no output"
+        raise RuntimeError(
+            f"{Path(str(command[0])).name} exited with code {result.returncode}:\n{detail}"
+        )
     return result.stdout
 
 
@@ -274,6 +278,21 @@ def eval_qwen(
     runs: int,
     max_new_tokens: int,
 ) -> dict[str, object]:
+    required = (
+        "model.tiq",
+        "weights.bin",
+        "tokenizer.json",
+        "model_case.bin",
+        "fixtures.json",
+    )
+    missing = [name for name in required if not (model_dir / name).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Qwen evaluation files are missing: "
+            + ", ".join(missing)
+            + ". Run the Qwen preparation commands in README.md."
+        )
+
     check = run(
         checker,
         model_dir / "model.tiq",

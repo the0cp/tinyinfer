@@ -49,6 +49,7 @@ The full text-generation build needs CMake 3.19+, a C++20 compiler, Git, and a R
 ```bash
 sudo dnf install -y gcc-c++ cmake ninja-build git curl pkgconf-pkg-config
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+curl -LsSf https://astral.sh/uv/install.sh | sh
 source "$HOME/.cargo/env"
 
 git clone --recurse-submodules https://github.com/the0cp/tinyinfer.git
@@ -77,51 +78,20 @@ ctest --test-dir build-tsan --output-on-failure
 
 ## Prepare models
 
-Models are stored under `models/`
-
-### Qwen2.5-0.5B-Instruct
-
-Download the pinned checkpoint and convert it to tinyinfer's BF16 format:
+Prepares Qwen2.5-0.5B-Instruct, Fashion-MNIST and the evaluation fixtures under `models/`:
 
 ```bash
-python3 -m venv build/qwen-env
-source build/qwen-env/bin/activate
-python -m pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -r tools/qwen-reference-requirements.txt
-
-huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct \
-  --revision 7ae557604adf67be50417f59c2c2f167def9a775 \
-  --local-dir models/sources/qwen2.5-0.5b-instruct-hf
-
-python tools/convert_qwen2.py \
-  --model-dir models/sources/qwen2.5-0.5b-instruct-hf \
-  --output-dir models/qwen2.5-0.5b
-```
-
-### Fashion-MNIST
-
-Download the dataset, train the example MLP and export it:
-
-```bash
-python3 -m venv build/fashion-env
-source build/fashion-env/bin/activate
-python -m pip install numpy
-
-python tools/prepare_fashion_mnist.py \
-  --data-dir models/fashion-mnist-data \
-  --output-dir models/fashion-mnist-final \
-  --tinyinfer build-release/tinyinfer
+./tools/prepare_models.sh
 ```
 
 ## Generate text
 
-The Qwen directory must contain `model.tiq`, `weights.bin` and `tokenizer.json`.
+Generation needs `model.tiq`, `weights.bin` and `tokenizer.json`. Model evaluation also needs `model_case.bin` and `fixtures.json` from the fixture export above.
 
 ```bash
 ./build-release/tinyinfer generate \
   models/qwen2.5-0.5b \
-  "Explain KV cache in one sentence." \
-  32
+  "Explain KV cache in one sentence."
 ```
 
 `max-new-tokens` is optional, defaults to 32, and must be positive. The command reports token counts, Prefill latency, Decode latency and throughput.
@@ -163,8 +133,7 @@ Measurement definitions and recorded results are in
 The evaluation runner checks model quality, numerical agreement and runtime performance. It evaluates the exported Fashion-MNIST model on all 10,000 test images, compares every Qwen decoder layer and final logits against the reference through EOS, repeats CLI generation while recording Prefill/Decode metrics, and runs the focused cache, Linear and memory-plan benchmarks.
 
 ```bash
-python -m pip install -r tools/evaluation-requirements.txt
-python tools/evaluate.py
+build/model-env/bin/python tools/evaluate.py
 ```
 
 [benchmark/evaluation](benchmark/evaluation/README.md).
