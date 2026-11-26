@@ -24,16 +24,39 @@ struct Qwen2Config{
     DecoderBlockConfig block;
 };
 
+struct Qwen2ModelInfo{
+    std::string model_id;
+    std::string revision;
+    std::string source_sha256;
+    size_t weight_bytes;
+    Qwen2Config config;
+};
+
 struct Qwen2Model{
     std::string model_id;
     std::string revision;
     std::string source_sha256;
+    size_t weight_bytes;
     Qwen2Config config;
     Tensor token_embedding;
     std::vector<DecoderBlockWeights> layers;
     Tensor final_norm;
 };
 
+struct Qwen2MemoryPlan{
+    size_t weight_bytes;
+    size_t kv_cache_bytes;
+
+    size_t persistent_bytes() const noexcept;
+};
+
+Qwen2MemoryPlan plan_qwen2_memory(
+    const Qwen2Config& config,
+    size_t weight_bytes,
+    size_t max_tokens
+);
+
+Qwen2ModelInfo inspect_qwen2_model(const std::filesystem::path& manifest_path);
 Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path);
 
 class Qwen2Decoder{

@@ -198,6 +198,10 @@ void test_loads_valid_package(){
     const std::filesystem::path manifest = write_package("valid", Mutation::None);
     const Qwen2Model model = load_qwen2_model(manifest);
     expect(model.model_id == "test/qwen2", "model id");
+    expect(
+        model.weight_bytes == std::filesystem::file_size(manifest.parent_path() / "weights.bin"),
+        "weight storage size"
+    );
     expect(model.config.vocab_size == 16, "vocabulary size");
     expect(model.config.num_layers == 1, "layer count");
     expect(model.layers.size() == 1, "loaded layers");
@@ -211,6 +215,74 @@ void test_loads_valid_package(){
         model.token_embedding.buffer().get() == model.layers[0].q_weight.buffer().get(),
         "all tensors share one immutable weight buffer"
     );
+    std::filesystem::remove_all(manifest.parent_path());
+}
+
+void test_inspects_without_loading_weights(){
+    const std::filesystem::path manifest = write_package("inspect", Mutation::None);
+    const size_t live_before = cpu_buffer_stats().live_bytes;
+    const Qwen2ModelInfo info = inspect_qwen2_model(manifest);
+
+    expect(info.model_id == "test/qwen2", "inspected model id");
+    expect(info.config.num_layers == 1, "inspected layer count");
+    expect(
+        info.weight_bytes == std::filesystem::file_size(manifest.parent_path() / "weights.bin"),
+        "inspected weight bytes"
+    );
+    expect(
+        cpu_buffer_stats().live_bytes == live_before,
+        "inspection does not allocate weight storage"
+    );
+
+    std::filesystem::remove_all(manifest.parent_path());
+}
+
+void test_memory_plan(){
+    const std::filesystem::path manifest = write_package("memory_plan", Mutation::None);
+    const Qwen2Model model = load_qwen2_model(manifest);
+    const Qwen2MemoryPlan plan = plan_qwen2_memory(model.config, model.weight_bytes, 4);
+    size_t actual_kv_bytes = 0;
+
+    {
+        const ContiguousKvCache cache({
+            4,
+            model.config.block.kv_heads,
+            model.config.block.hidden_size / model.config.block.query_heads
+        });
+        actual_kv_bytes = model.config.num_layers * cache.allocated_bytes();
+    }
+
+    expect(plan.weight_bytes == model.weight_bytes, "planned weight bytes");
+    expect(plan.kv_cache_bytes == actual_kv_bytes, "planned KV cache bytes");
+    expect(
+        plan.persistent_bytes() == model.weight_bytes + plan.kv_cache_bytes,
+        "planned persistent bytes"
+    );
+    expect(cpu_buffer_stats().live_bytes == model.weight_bytes, "loaded weight bytes");
+
+    {
+        const Qwen2Decoder decoder(model, 4);
+        expect(
+            cpu_buffer_stats().live_bytes == plan.persistent_bytes(),
+            "decoder storage matches the persistent memory plan"
+        );
+    }
+
+    expect(cpu_buffer_stats().live_bytes == model.weight_bytes, "decoder releases KV storage");
+
+    expect_throw(
+        [&](){ (void)plan_qwen2_memory(model.config, model.weight_bytes, 0); },
+        "capacity"
+    );
+    expect_throw(
+        [&](){ (void)plan_qwen2_memory(model.config, model.weight_bytes, 33); },
+        "capacity"
+    );
+    expect_throw(
+        [&](){ (void)plan_qwen2_memory(model.config, 0, 4); },
+        "weights"
+    );
+
     std::filesystem::remove_all(manifest.parent_path());
 }
 
@@ -341,7 +413,9 @@ void test_greedy_generation_stops_and_resets(){
 int main(){
     try{
         test_expect_close_rejects_non_finite();
+        test_inspects_without_loading_weights();
         test_loads_valid_package();
+        test_memory_plan();
         test_rejects_invalid_packages();
         test_decoder_prefill_decode_and_reset();
         test_decoder_rejects_invalid_model_and_capacity();

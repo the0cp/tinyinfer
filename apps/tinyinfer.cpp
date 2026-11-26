@@ -1,3 +1,4 @@
+#include <tinyinfer/core/buffer.h>
 #include <tinyinfer/llm/qwen2.h>
 #include <tinyinfer/llm/qwen2_tokenizer.h>
 #include <tinyinfer/runtime/model_loader.h>
@@ -35,9 +36,40 @@ size_t parse_max_new_tokens(std::string_view text){
     return value;
 }
 
+size_t parse_max_context_tokens(std::string_view text){
+    size_t value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+
+    if(error != std::errc{} || end != text.data() + text.size() || value == 0){
+        throw std::invalid_argument("max-context-tokens must be a positive integer.");
+    }
+    return value;
+}
+
 int64_t argmax(const tinyinfer::Tensor& logits){
     const float* begin = logits.data();
     return static_cast<int64_t>(std::max_element(begin, begin + logits.numel()) - begin);
+}
+
+int inspect_qwen(
+    const std::filesystem::path& model_directory,
+    size_t max_context_tokens
+){
+    const tinyinfer::Qwen2ModelInfo info = tinyinfer::inspect_qwen2_model(
+        model_directory / "model.tiq"
+    );
+    const tinyinfer::Qwen2MemoryPlan memory = tinyinfer::plan_qwen2_memory(
+        info.config,
+        info.weight_bytes,
+        max_context_tokens
+    );
+
+    std::cout << "model_id=" << info.model_id << '\n'
+              << "max_context_tokens=" << max_context_tokens << '\n'
+              << "weight_bytes=" << memory.weight_bytes << '\n'
+              << "kv_cache_bytes=" << memory.kv_cache_bytes << '\n'
+              << "persistent_bytes=" << memory.persistent_bytes() << '\n';
+    return 0;
 }
 
 tinyinfer::Tensor load_input(
@@ -76,6 +108,11 @@ int run_graph(
     const std::filesystem::path& input_path
 ){
     auto session = tinyinfer::ModelLoader::load(manifest);
+    size_t constant_bytes = 0;
+    for(const auto& constant : session->graph().constants()){
+        constant_bytes += constant.second.size_bytes();
+    }
+
     const tinyinfer::Tensor input = load_input(input_path, session->metadata().input_shape);
 
     tinyinfer::RunProfile profile;
@@ -104,7 +141,11 @@ int run_graph(
     
     std::cout << std::fixed << std::setprecision(3)
               << "inference_ms=" << static_cast<double>(profile.duration_ns) / 1'000'000.0 << '\n'
-              << "peak_live_bytes=" << profile.peak_live_bytes << '\n';
+              << "peak_live_bytes=" << profile.peak_live_bytes << '\n'
+              << "constant_bytes=" << constant_bytes << '\n'
+              << "planned_arena_bytes="
+              << session->session_state().memory_plan().arena_bytes() << '\n'
+              << "peak_cpu_buffer_bytes=" << tinyinfer::cpu_buffer_stats().peak_bytes << '\n';
     return 0;
 }
 
@@ -132,6 +173,11 @@ int generate(
     const size_t capacity = prompt.size() + cached_gened_tokens;
     const int64_t eos_token_id = model.config.eos_token_id;
     const size_t cpu_threads = std::max<size_t>(1, std::thread::hardware_concurrency());
+    const tinyinfer::Qwen2MemoryPlan memory = tinyinfer::plan_qwen2_memory(
+        model.config,
+        model.weight_bytes,
+        capacity
+    );
     tinyinfer::Qwen2Decoder decoder(std::move(model), capacity, cpu_threads);
 
     std::vector<int64_t> generated;
@@ -167,6 +213,7 @@ int generate(
     const double inference_ms = prefill_ms + decode_ms;
     const double decode_tokens_ps = decode_ms == 0.0 ? 0.0 : static_cast<double>(decode_steps) * 1000.0 / decode_ms;
     const double gened_tokens_ps = inference_ms == 0.0 ? 0.0 : static_cast<double>(generated.size()) * 1000.0 / inference_ms;
+    const tinyinfer::CpuBufferStats memory_stats = tinyinfer::cpu_buffer_stats();
 
     std::cout << tokenizer.decode(generated, true) << "\n\n"
               << std::fixed << std::setprecision(3)
@@ -176,12 +223,16 @@ int generate(
               << "prefill_ms=" << prefill_ms << '\n'
               << "decode_ms=" << decode_ms << '\n'
               << "decode_tokens_per_second=" << decode_tokens_ps << '\n'
-              << "generated_tokens_per_second=" << gened_tokens_ps << '\n';
+              << "generated_tokens_per_second=" << gened_tokens_ps << '\n'
+              << "weight_bytes=" << memory.weight_bytes << '\n'
+              << "kv_cache_bytes=" << memory.kv_cache_bytes << '\n'
+              << "persistent_bytes=" << memory.persistent_bytes() << '\n'
+              << "peak_cpu_buffer_bytes=" << memory_stats.peak_bytes << '\n';
     return 0;
 }
 
 void print_usage(std::ostream& stream){
-    stream << "Usage:\n" << "  tinyinfer run <model.ti> <input.f32>\n" << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
+    stream << "Usage:\n" << "  tinyinfer run <model.ti> <input.f32>\n" << "  tinyinfer inspect <model-directory> <max-context-tokens>\n" << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
 }
 
 }
@@ -195,6 +246,11 @@ int main(int argc, char** argv){
 
         if(argc == 4 && std::string_view(argv[1]) == "run"){
             return run_graph(argv[2], argv[3]);
+        }
+
+        if(argc == 4 && std::string_view(argv[1]) == "inspect"){
+            const size_t max_context_tokens = parse_max_context_tokens(argv[3]);
+            return inspect_qwen(argv[2], max_context_tokens);
         }
 
         if(argc < 4 || argc > 5 || std::string_view(argv[1]) != "generate"){

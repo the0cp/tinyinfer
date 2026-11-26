@@ -35,6 +35,13 @@ private:
     size_t size_bytes_ = 0;
 };
 
+struct CpuBufferStats{
+    size_t live_bytes;
+    size_t peak_bytes;
+};
+
+// Counts CpuBuffer payloads only; peak_bytes covers the process lifetime.
+CpuBufferStats cpu_buffer_stats() noexcept;
 std::shared_ptr<Buffer> make_cpu_buffer(size_t size_bytes);
 
 }

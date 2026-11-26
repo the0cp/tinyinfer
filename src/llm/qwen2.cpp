@@ -645,11 +645,84 @@ Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path){
         std::move(manifest.model_id),
         std::move(manifest.revision),
         std::move(manifest.source_sha256),
+        buffer->size_bytes(),
         manifest.config,
         tensor("model.embed_tokens.weight"),
         std::move(layers),
         tensor("model.norm.weight")
     };
+}
+
+Qwen2ModelInfo inspect_qwen2_model(const std::filesystem::path& manifest_path){
+    QwenManifest manifest = parse_manifest(manifest_path);
+    const std::filesystem::path weights_path = manifest_path.parent_path() / manifest.weights_file;
+    std::error_code error;
+    const uintmax_t weight_bytes = std::filesystem::file_size(weights_path, error);
+
+    if(error){
+        throw std::runtime_error("Cannot get Qwen2 weights file size: " + weights_path.string());
+    }
+    
+    if(weight_bytes == 0 || weight_bytes > std::numeric_limits<size_t>::max()){
+        throw std::runtime_error("Qwen2 weights file has an unsupported size.");
+    }
+
+    return {
+        std::move(manifest.model_id),
+        std::move(manifest.revision),
+        std::move(manifest.source_sha256),
+        static_cast<size_t>(weight_bytes),
+        manifest.config
+    };
+}
+
+size_t Qwen2MemoryPlan::persistent_bytes() const noexcept{
+    return weight_bytes + kv_cache_bytes;
+}
+
+Qwen2MemoryPlan plan_qwen2_memory(
+    const Qwen2Config& config,
+    size_t weight_bytes,
+    size_t max_tokens
+){
+    if(weight_bytes == 0){
+        throw std::invalid_argument("Qwen2 weights must not be empty.");
+    }
+    if(max_tokens == 0 || max_tokens > config.max_position_embeddings){
+        throw std::invalid_argument("Qwen2 memory plan capacity is invalid.");
+    }
+    if(
+        config.num_layers == 0 || config.block.hidden_size == 0 ||
+        config.block.query_heads == 0 || config.block.kv_heads == 0 ||
+        config.block.hidden_size % config.block.query_heads != 0 ||
+        config.block.query_heads % config.block.kv_heads != 0
+    ){
+        throw std::invalid_argument("Qwen2 memory plan dimensions are invalid.");
+    }
+
+    const size_t cache_bytes = tensor_bytes(
+        {
+            max_tokens,
+            config.block.kv_heads,
+            config.block.hidden_size / config.block.query_heads
+        },
+        DataType::Float32
+    );
+
+    size_t kv_cache_bytes = 0;
+    for(size_t layer = 0; layer < config.num_layers; layer++){
+        for(size_t copy = 0; copy < 2; copy++){
+            if(cache_bytes > std::numeric_limits<size_t>::max() - kv_cache_bytes){
+                throw std::overflow_error("Qwen2 KV cache size overflows size_t.");
+            }
+            kv_cache_bytes += cache_bytes;
+        }
+    }
+
+    if(weight_bytes > std::numeric_limits<size_t>::max() - kv_cache_bytes){
+        throw std::overflow_error("Qwen2 persistent memory size overflows size_t.");
+    }
+    return {weight_bytes, kv_cache_bytes};
 }
 
 Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens, size_t num_threads)

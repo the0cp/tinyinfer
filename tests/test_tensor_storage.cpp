@@ -145,6 +145,22 @@ void test_cpu_buffer_contract(){
     expect(buffer.data() != nullptr, "non-empty buffer data");
 }
 
+void test_cpu_buffer_stats(){
+    expect(cpu_buffer_stats().live_bytes == 0, "no CPU buffer payloads are live before the test");
+
+    {
+        const std::shared_ptr<Buffer> first = make_cpu_buffer(16);
+        expect(cpu_buffer_stats().live_bytes == 16, "one CPU buffer is counted");
+
+        const std::shared_ptr<Buffer> second = make_cpu_buffer(24);
+        const CpuBufferStats during = cpu_buffer_stats();
+        expect(during.live_bytes == 40, "live CPU buffer bytes are summed");
+        expect(during.peak_bytes >= during.live_bytes, "peak covers the current allocation");
+    }
+
+    expect(cpu_buffer_stats().live_bytes == 0, "released CPU buffers leave no live payload");
+}
+
 void test_tensor_owning_constructors_keep_source_api(){
     Tensor zeros({2, 3});
     expect(zeros.is_contiguous(), "owning tensor is contiguous");
@@ -345,6 +361,7 @@ int main(){
         {"dtype_and_checked_byte_helpers", test_dtype_and_checked_byte_helpers},
         {"bfloat16_storage_access_clone_and_fill", test_bfloat16_storage_access_clone_and_fill},
         {"cpu_buffer_contract", test_cpu_buffer_contract},
+        {"cpu_buffer_stats", test_cpu_buffer_stats},
         {"tensor_owning_constructors_keep_source_api", test_tensor_owning_constructors_keep_source_api},
         {"shared_storage_lifetime_aliasing_and_clone", test_shared_storage_lifetime_aliasing_and_clone},
         {"offset_and_strided_indexing", test_offset_and_strided_indexing},
