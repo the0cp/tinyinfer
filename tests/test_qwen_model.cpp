@@ -258,6 +258,52 @@ void test_memory_plan(){
         plan.persistent_bytes() == model.weight_bytes + plan.kv_cache_bytes,
         "planned persistent bytes"
     );
+    const size_t bytes_per_token = plan.kv_cache_bytes / 4;
+    expect(
+        fit_qwen2_context(model.config, model.weight_bytes, plan.persistent_bytes()) == 4,
+        "exact persistent budget"
+    );
+    const Qwen2MemoryPlan one_token = plan_qwen2_memory(
+        model.config,
+        model.weight_bytes,
+        1
+    );
+    expect(
+        fit_qwen2_context(model.config, model.weight_bytes, one_token.persistent_bytes()) == 1,
+        "exact one-token budget"
+    );
+    expect(
+        fit_qwen2_context(
+            model.config,
+            model.weight_bytes,
+            one_token.persistent_bytes() - 1
+        ) == 0,
+        "one-token budget rejects a missing byte"
+    );
+    expect(
+        fit_qwen2_context(
+            model.config,
+            model.weight_bytes,
+            plan.persistent_bytes() + bytes_per_token - 1
+        ) == 4,
+        "partial token does not increase fitted context"
+    );
+    expect(
+        fit_qwen2_context(model.config, model.weight_bytes, model.weight_bytes) == 0,
+        "weight-only budget cannot fit a token"
+    );
+    expect(
+        fit_qwen2_context(model.config, model.weight_bytes, model.weight_bytes - 1) == 0,
+        "budget below the weights cannot fit a token"
+    );
+    expect(
+        fit_qwen2_context(
+            model.config,
+            model.weight_bytes,
+            std::numeric_limits<size_t>::max()
+        ) == model.config.max_position_embeddings,
+        "fitted context respects the model limit"
+    );
     expect(cpu_buffer_stats().live_bytes == model.weight_bytes, "loaded weight bytes");
 
     {

@@ -8,6 +8,7 @@
 - Qwen reference generation: 30 prompt tokens, 24 generated token ids including EOS, 23 cached Decode steps, stop=eos.
 - Qwen reference output: `A key-value cache stores data in memory to quickly retrieve values based on keys, typically for quick access to data.`
 - Qwen generation: median decode throughput **8.19 tokens/s** across 5 runs.
+- Qwen memory at 32,768 tokens: **1.67 GiB** planned persistent memory, **1.67 GiB** measured CpuBuffer peak and **1.74 GiB** peak RSS.
 - Memory plan: median batch-mean latency **9.21** → **6.80 µs**.
 
 ## Method
@@ -18,6 +19,7 @@
 - Performance prompt: system=`You are a helpful assistant.`; user=`Explain KV cache in one short sentence.`
 - Fashion-MNIST quality is computed from the exported FP32 weights over the official 10,000-image test split. One exported sample is also checked through the C++ runtime.
 - Qwen correctness compares prefill and cached-decode logits against the stored reference fixture and requires identical greedy tokens.
+- Qwen memory points run in separate processes with the same EOS-terminated response; `/usr/bin/time` records peak RSS.
 - Component benchmarks use their built-in warm-up and repeat policies. Memory-plan values are medians of five independent benchmark invocations. Paged-cache memory figures come from cache state rather than process RSS.
 
 ## Figures
@@ -28,6 +30,7 @@
 - `figures/qwen_layer_max_error.{png,svg}`
 - `figures/qwen_layer_mean_error.{png,svg}`
 - `figures/qwen_generation_latency.{png,svg}`
+- `figures/qwen_memory_scaling.{png,svg}`
 - `figures/kv_cache_speedup.{png,svg}`
 - `figures/paged_kv_memory.{png,svg}`
 - `figures/linear_threading_speedup.{png,svg}`

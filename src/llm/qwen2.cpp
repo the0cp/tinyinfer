@@ -725,6 +725,19 @@ Qwen2MemoryPlan plan_qwen2_memory(
     return {weight_bytes, kv_cache_bytes};
 }
 
+size_t fit_qwen2_context(
+    const Qwen2Config& config,
+    size_t weight_bytes,
+    size_t persistent_budget_bytes
+){
+    const Qwen2MemoryPlan one_token = plan_qwen2_memory(config, weight_bytes, 1);
+    if(persistent_budget_bytes < one_token.persistent_bytes()){
+        return 0;
+    }
+
+    return std::min(config.max_position_embeddings, (persistent_budget_bytes - weight_bytes) / one_token.kv_cache_bytes);
+}
+
 Qwen2Decoder::Qwen2Decoder(Qwen2Model model, size_t max_tokens, size_t num_threads)
     : model_(std::move(model)), capacity_tokens_(max_tokens){
     validate_execution_model(model_);

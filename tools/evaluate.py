@@ -51,6 +51,7 @@ COLORS = ("#2563EB", "#F59E0B", "#10B981", "#8B5CF6")
 REFERENCE_SYSTEM_PROMPT = "You are a concise inference systems tutor."
 REFERENCE_USER_PROMPT = "Explain KV cache in one short sentence."
 CLI_SYSTEM_PROMPT = "You are a helpful assistant."
+MEMORY_CONTEXTS = (128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
 
 
 def parse_args() -> argparse.Namespace:
@@ -108,6 +109,25 @@ def run(*command: object) -> str:
             f"{Path(str(command[0])).name} exited with code {result.returncode}:\n{detail}"
         )
     return result.stdout
+
+
+def run_measured(*command: object) -> tuple[str, int]:
+    marker = "tinyinfer_peak_rss_kib="
+    result = subprocess.run(
+        ["/usr/bin/time", "-f", marker + "%M", *(str(value) for value in command)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "no output"
+        raise RuntimeError(
+            f"{Path(str(command[0])).name} exited with code {result.returncode}:\n{detail}"
+        )
+
+    match = re.search(rf"^{marker}(\d+)$", result.stderr, re.MULTILINE)
+    if not match:
+        raise RuntimeError("/usr/bin/time did not report peak RSS")
+    return result.stdout, int(match.group(1)) * 1024
 
 
 def csv_output(text: str) -> list[dict[str, str]]:
@@ -385,6 +405,72 @@ def eval_qwen(
     }
 
 
+def eval_qwen_memory(model_dir: Path, tinyinfer: Path) -> list[dict[str, object]]:
+    prompt_probe = values(
+        run(tinyinfer, "generate", model_dir, REFERENCE_USER_PROMPT, 1)
+    )
+    prompt_tokens = int(prompt_probe["prompt_tokens"])
+    model_probe = values(run(tinyinfer, "inspect", model_dir, 1))
+    model_limit = int(model_probe["model_max_context_tokens"])
+    contexts = [
+        tokens
+        for tokens in MEMORY_CONTEXTS
+        if prompt_tokens <= tokens <= model_limit
+    ]
+    if model_limit >= prompt_tokens and model_limit not in contexts:
+        contexts.append(model_limit)
+
+    rows = []
+    generated_text = None
+    for context_tokens in contexts:
+        planned = values(run(tinyinfer, "inspect", model_dir, context_tokens))
+        max_new_tokens = context_tokens - prompt_tokens + 1
+        output, peak_rss_bytes = run_measured(
+            tinyinfer,
+            "generate",
+            model_dir,
+            REFERENCE_USER_PROMPT,
+            max_new_tokens,
+        )
+        measured = values(output)
+        current_text = output.split("\n\n", maxsplit=1)[0].strip()
+        current_generated_tokens = int(measured["generated_tokens"])
+
+        if current_generated_tokens >= max_new_tokens:
+            raise RuntimeError(
+                f"Qwen memory run did not reach EOS at {context_tokens} tokens"
+            )
+        if generated_text is None:
+            generated_text = current_text
+        elif current_text != generated_text:
+            raise RuntimeError(
+                f"Qwen memory run changed output at {context_tokens} tokens"
+            )
+
+        for field in ("weight_bytes", "kv_cache_bytes", "persistent_bytes"):
+            if planned[field] != measured[field]:
+                raise RuntimeError(
+                    f"Qwen memory mismatch at {context_tokens} tokens: {field}"
+                )
+
+        persistent_bytes = int(planned["persistent_bytes"])
+        peak_buffer_bytes = int(measured["peak_cpu_buffer_bytes"])
+        rows.append(
+            {
+                "context_tokens": context_tokens,
+                "weight_bytes": int(planned["weight_bytes"]),
+                "kv_cache_bytes": int(planned["kv_cache_bytes"]),
+                "persistent_bytes": persistent_bytes,
+                "peak_cpu_buffer_bytes": peak_buffer_bytes,
+                "peak_rss_bytes": peak_rss_bytes,
+                "managed_overhead_bytes": peak_buffer_bytes - persistent_bytes,
+                "rss_overhead_bytes": peak_rss_bytes - persistent_bytes,
+                "generated_tokens": current_generated_tokens,
+            }
+        )
+    return rows
+
+
 def eval_benchmarks(build_dir: Path) -> dict[str, object]:
     kv_cache = csv_output(run(build_dir / "bench_kv_cache"))
     paged_output = run(build_dir / "bench_paged_kv_cache")
@@ -648,6 +734,54 @@ def plot_qwen(
     save(figure, "qwen_generation_latency", figure_dir, copy_dirs)
 
 
+def plot_qwen_memory(
+    rows: list[dict[str, object]],
+    figure_dir: Path,
+    copy_dirs: list[Path],
+) -> None:
+    gib = 1024 ** 3
+    contexts = [row["context_tokens"] for row in rows]
+    figure, axis = plt.subplots(figsize=(8.4, 4.8))
+    axis.plot(
+        contexts,
+        [row["persistent_bytes"] / gib for row in rows],
+        marker="o",
+        linewidth=2.2,
+        color=COLORS[0],
+        label="Planned persistent memory",
+    )
+    axis.plot(
+        contexts,
+        [row["peak_cpu_buffer_bytes"] / gib for row in rows],
+        marker="o",
+        linewidth=2.2,
+        color=COLORS[2],
+        label="Measured CpuBuffer peak",
+    )
+    axis.plot(
+        contexts,
+        [row["peak_rss_bytes"] / gib for row in rows],
+        marker="o",
+        linewidth=2.2,
+        color=COLORS[1],
+        label="Measured peak RSS",
+    )
+    axis.axhline(
+        rows[0]["weight_bytes"] / gib,
+        color="#64748B",
+        linestyle="--",
+        linewidth=1.4,
+        label="Model weights",
+    )
+    axis.set_xscale("log", base=2)
+    axis.set_xticks(contexts, [str(tokens) for tokens in contexts], rotation=35)
+    axis.set_xlabel("Reserved context capacity (tokens)")
+    axis.set_ylabel("Memory (GiB)")
+    axis.set_title("Qwen memory scales predictably with context capacity")
+    axis.legend()
+    save(figure, "qwen_memory_scaling", figure_dir, copy_dirs)
+
+
 def plot_benchmarks(
     result: dict[str, object],
     figure_dir: Path,
@@ -747,6 +881,8 @@ def write_report(path: Path, result: dict[str, object]) -> None:
     max_error = max(row["max_abs_error"] for row in qwen["correctness"])
     throughput = median([row["decode_tokens_per_second"] for row in qwen_perf])
     memory = result["benchmarks"]["memory_plan"]
+    qwen_memory = qwen["memory"]
+    longest = qwen_memory[-1]
     path.write_text(
         "\n".join(
             (
@@ -769,6 +905,10 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 f"- Qwen reference output: `{reference['generated_text']}`",
                 f"- Qwen generation: median decode throughput {throughput:.2f} tokens/s "
                 f"across {len(qwen_perf)} runs.",
+                f"- Qwen memory at {longest['context_tokens']} tokens: planned persistent "
+                f"{longest['persistent_bytes'] / 1024 ** 3:.2f} GiB, measured CpuBuffer peak "
+                f"{longest['peak_cpu_buffer_bytes'] / 1024 ** 3:.2f} GiB, and peak RSS "
+                f"{longest['peak_rss_bytes'] / 1024 ** 3:.2f} GiB.",
                 f"- Memory plan: median batch-mean latency "
                 f"{float(memory['unplanned_batch_mean_median_us']):.2f} → "
                 f"{float(memory['planned_batch_mean_median_us']):.2f} µs.",
@@ -789,6 +929,9 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 "the C++ runtime.",
                 "- Qwen correctness compares prefill and cached-decode logits against the "
                 "stored reference fixture and requires identical greedy tokens.",
+                "- Qwen memory points run in separate processes. Each run reserves the plotted "
+                "context capacity, generates the same EOS-terminated response, and reports "
+                "CpuBuffer peak plus peak RSS from /usr/bin/time.",
                 "- Component benchmarks use their built-in warm-up and repeat policies. "
                 "Memory-plan values are medians of five independent benchmark invocations. "
                 "Paged-cache memory figures come from cache state rather than process RSS.",
@@ -802,6 +945,7 @@ def write_report(path: Path, result: dict[str, object]) -> None:
                 "- `figures/qwen_layer_max_error.{png,svg}`",
                 "- `figures/qwen_layer_mean_error.{png,svg}`",
                 "- `figures/qwen_generation_latency.{png,svg}`",
+                "- `figures/qwen_memory_scaling.{png,svg}`",
                 "- `figures/kv_cache_speedup.{png,svg}`",
                 "- `figures/paged_kv_memory.{png,svg}`",
                 "- `figures/linear_threading_speedup.{png,svg}`",
@@ -838,9 +982,13 @@ def main() -> None:
         args.qwen_runs,
         args.max_new_tokens,
     )
+    qwen["memory"] = eval_qwen_memory(
+        args.qwen_model.resolve(),
+        build_dir / "tinyinfer",
+    )
     benchmarks = eval_benchmarks(build_dir)
     result = {
-        "schema_version": 2,
+        "schema_version": 3,
         "environment": {
             "commit": run("git", "-C", ROOT, "rev-parse", "HEAD").strip(),
             "cpu": cpu_name(),
@@ -862,6 +1010,7 @@ def main() -> None:
     write_csv(output_dir / "qwen_correctness.csv", qwen["correctness"])
     write_csv(output_dir / "qwen_layer_errors.csv", qwen["layer_metrics"])
     write_csv(output_dir / "qwen_generation.csv", qwen["performance"])
+    write_csv(output_dir / "qwen_memory.csv", qwen["memory"])
     write_csv(output_dir / "kv_cache.csv", benchmarks["kv_cache"])
     write_csv(output_dir / "paged_kv_cache.csv", benchmarks["paged_kv_cache"])
     write_csv(output_dir / "linear_threading.csv", benchmarks["linear"])
@@ -870,6 +1019,7 @@ def main() -> None:
     style()
     plot_fashion(fashion, figure_dir, copy_dirs)
     plot_qwen(qwen, figure_dir, copy_dirs)
+    plot_qwen_memory(qwen["memory"], figure_dir, copy_dirs)
     plot_benchmarks(benchmarks, figure_dir, copy_dirs)
     write_report(output_dir / "README.md", result)
 

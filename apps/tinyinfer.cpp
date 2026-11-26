@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
@@ -25,6 +26,7 @@ using Clock = std::chrono::steady_clock;
 
 constexpr std::string_view system_prompt = "You are a helpful assistant.";
 constexpr size_t default_max_new_tokens = 1024;
+constexpr size_t bytes_per_mib = 1024 * 1024;
 
 size_t parse_max_new_tokens(std::string_view text){
     size_t value = 0;
@@ -46,6 +48,19 @@ size_t parse_max_context_tokens(std::string_view text){
     return value;
 }
 
+size_t parse_memory_budget(std::string_view text){
+    size_t value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+
+    if(
+        error != std::errc{} || end != text.data() + text.size() || value == 0 ||
+        value > std::numeric_limits<size_t>::max() / bytes_per_mib
+    ){
+        throw std::invalid_argument("persistent-memory-mib must be a positive integer.");
+    }
+    return value * bytes_per_mib;
+}
+
 int64_t argmax(const tinyinfer::Tensor& logits){
     const float* begin = logits.data();
     return static_cast<int64_t>(std::max_element(begin, begin + logits.numel()) - begin);
@@ -65,10 +80,45 @@ int inspect_qwen(
     );
 
     std::cout << "model_id=" << info.model_id << '\n'
+              << "model_max_context_tokens=" << info.config.max_position_embeddings << '\n'
               << "max_context_tokens=" << max_context_tokens << '\n'
               << "weight_bytes=" << memory.weight_bytes << '\n'
               << "kv_cache_bytes=" << memory.kv_cache_bytes << '\n'
               << "persistent_bytes=" << memory.persistent_bytes() << '\n';
+    return 0;
+}
+
+int fit_qwen(
+    const std::filesystem::path& model_directory,
+    size_t persistent_budget_bytes
+){
+    const tinyinfer::Qwen2ModelInfo info = tinyinfer::inspect_qwen2_model(
+        model_directory / "model.tiq"
+    );
+    const size_t max_context_tokens = tinyinfer::fit_qwen2_context(
+        info.config,
+        info.weight_bytes,
+        persistent_budget_bytes
+    );
+    const tinyinfer::Qwen2MemoryPlan memory = max_context_tokens == 0
+        ? tinyinfer::Qwen2MemoryPlan{info.weight_bytes, 0}
+        : tinyinfer::plan_qwen2_memory(
+              info.config,
+              info.weight_bytes,
+              max_context_tokens
+          );
+    const size_t unused_bytes = persistent_budget_bytes > memory.persistent_bytes()
+        ? persistent_budget_bytes - memory.persistent_bytes()
+        : 0;
+
+    std::cout << "model_id=" << info.model_id << '\n'
+              << "persistent_budget_bytes=" << persistent_budget_bytes << '\n'
+              << "fits=" << (max_context_tokens == 0 ? "false" : "true") << '\n'
+              << "max_context_tokens=" << max_context_tokens << '\n'
+              << "weight_bytes=" << memory.weight_bytes << '\n'
+              << "kv_cache_bytes=" << memory.kv_cache_bytes << '\n'
+              << "persistent_bytes=" << memory.persistent_bytes() << '\n'
+              << "unused_bytes=" << unused_bytes << '\n';
     return 0;
 }
 
@@ -232,7 +282,11 @@ int generate(
 }
 
 void print_usage(std::ostream& stream){
-    stream << "Usage:\n" << "  tinyinfer run <model.ti> <input.f32>\n" << "  tinyinfer inspect <model-directory> <max-context-tokens>\n" << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
+    stream << "Usage:\n" 
+    << "  tinyinfer run <model.ti> <input.f32>\n" 
+    << "  tinyinfer inspect <model-directory> <max-context-tokens>\n" 
+    << "  tinyinfer fit <model-directory> <persistent-memory-mib>\n" 
+    << "  tinyinfer generate <model-directory> <prompt> [max-new-tokens]\n";
 }
 
 }
@@ -251,6 +305,11 @@ int main(int argc, char** argv){
         if(argc == 4 && std::string_view(argv[1]) == "inspect"){
             const size_t max_context_tokens = parse_max_context_tokens(argv[3]);
             return inspect_qwen(argv[2], max_context_tokens);
+        }
+
+        if(argc == 4 && std::string_view(argv[1]) == "fit"){
+            const size_t persistent_budget_bytes = parse_memory_budget(argv[3]);
+            return fit_qwen(argv[2], persistent_budget_bytes);
         }
 
         if(argc < 4 || argc > 5 || std::string_view(argv[1]) != "generate"){

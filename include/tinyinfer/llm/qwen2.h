@@ -55,6 +55,12 @@ Qwen2MemoryPlan plan_qwen2_memory(
     size_t weight_bytes,
     size_t max_tokens
 );
+// Covers weights and KV cache only; zero means one token does not fit.
+size_t fit_qwen2_context(
+    const Qwen2Config& config,
+    size_t weight_bytes,
+    size_t persistent_budget_bytes
+);
 
 Qwen2ModelInfo inspect_qwen2_model(const std::filesystem::path& manifest_path);
 Qwen2Model load_qwen2_model(const std::filesystem::path& manifest_path);

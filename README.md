@@ -9,7 +9,7 @@ A lightweight C++20 CPU inference runtime for graph and generative workloads.
 | Tensor | Shared CPU buffers, typed storage, strided views, zero-copy reshape, FP32 activations and BF16 weights |
 | CPU ops | Embedding, Linear, MatMul, Add, ReLU, Softmax, RMSNorm and SwiGLU |
 | Graph runtime | Graph validation, optimization, execution plans, kernel selection and sequential/parallel execution |
-| Memory and profiling | Activation reuse, per-run arenas, node timing, allocation metrics and Chrome trace export |
+| Memory and profiling | Activation reuse, per-run arenas, Qwen memory planning, allocation metrics and Chrome trace export |
 | LLM | Qwen2.5 decoder, GQA/MQA, RoPE, Prefill, cached Decode and greedy generation |
 | KV cache | Contiguous cache, paged cache and full-block prefix sharing |
 | Tokenizer | Hugging Face `tokenizer.json` through [`mlc-ai/tokenizers-cpp`](https://github.com/mlc-ai/tokenizers-cpp) submodule|
@@ -96,6 +96,22 @@ Generation needs `model.tiq`, `weights.bin` and `tokenizer.json`. Model evaluati
 
 `max-new-tokens` is optional, defaults to 1024, and must be positive. Generation stops earlier at EOS. The command reports token counts, Prefill latency, Decode latency and throughput.
 
+## Plan Qwen memory
+
+Inspect the persistent memory required by a context capacity without loading the weights:
+
+```bash
+./build-release/tinyinfer inspect models/qwen2.5-0.5b 1024
+```
+
+Or find the largest context that fits a persistent-memory budget in MiB:
+
+```bash
+./build-release/tinyinfer fit models/qwen2.5-0.5b 1024
+```
+
+Persistent memory includes model weights and the FP32 KV cache. Runtime buffers, libraries, thread stacks and allocator overhead are not part of this budget; generation reports the CpuBuffer peak, and evaluation also measures process peak RSS.
+
 ## Run a graph
 
 The input file contains contiguous little-endian FP32 values matching the model input shape.
@@ -130,7 +146,7 @@ Measurement definitions and recorded results are in
 
 ## Model evaluation
 
-The evaluation runner checks model quality, numerical agreement and runtime performance. It evaluates the exported Fashion-MNIST model on all 10,000 test images, compares every Qwen decoder layer and final logits against the reference through EOS, repeats CLI generation while recording Prefill/Decode metrics, and runs the focused cache, Linear and memory-plan benchmarks.
+The evaluation runner checks model quality, numerical agreement, runtime performance and Qwen memory scaling. It evaluates the exported Fashion-MNIST model on all 10,000 test images, compares every Qwen decoder layer and final logits against the reference through EOS, repeats CLI generation while recording Prefill/Decode and memory metrics, and runs the focused cache, Linear and memory-plan benchmarks.
 
 ```bash
 build/model-env/bin/python tools/evaluate.py
@@ -143,5 +159,7 @@ build/model-env/bin/python tools/evaluate.py
 ![Qwen reference logit error](benchmark/evaluation/figures/qwen_logit_error.svg)
 
 ![Qwen per-layer mean error](benchmark/evaluation/figures/qwen_layer_mean_error.svg)
+
+![Qwen memory scaling](benchmark/evaluation/figures/qwen_memory_scaling.svg)
 
 ![KV cache speedup](benchmark/evaluation/figures/kv_cache_speedup.svg)
